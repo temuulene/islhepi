@@ -76,6 +76,10 @@ snapshot <- islh_surveillance_snapshot(
 )
 ```
 
+When a baseline is supplied, it must describe the same duration as the
+snapshot `total` (for example, historical weekly totals for seven daily
+columns).
+
 `islh_count_events()` supports ordinary weeks with a chosen start day, ISO
 weeks and CDC epidemiological weeks. It constructs reporting periods from dates
 instead of requiring hand-written corrections around New Year.

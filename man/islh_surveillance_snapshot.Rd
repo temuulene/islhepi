@@ -26,7 +26,10 @@ islh_surveillance_snapshot(
 \item{periods}{Number of periods to show.}
 \item{interval}{Period spacing used to construct the window.}
 \item{week_start}{Start of an ordinary week, from 1 (Monday) to 7 (Sunday).}
-\item{baseline}{Optional result from \code{islh_surveillance_baseline()}.}
+\item{baseline}{Optional result from \code{islh_surveillance_baseline()}. Its
+limits must describe the same duration as the displayed \code{total}. For
+example, a seven-day snapshot should use a baseline of historical seven-day or
+weekly totals, not historical daily counts.}
 \item{include_total}{Add an \code{All} row. Available with one grouping column
 and appropriate only for mutually exclusive groups.}
 \item{total_label}{Label used for the total group.}

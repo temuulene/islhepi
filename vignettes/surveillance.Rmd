@@ -173,6 +173,12 @@ snapshot <- islh_surveillance_snapshot(
 snapshot
 ```
 
+The seven displayed daily counts add to one weekly total, so the weekly
+baseline above is comparable with `total`. Do not compare a seven-day total
+with a baseline calculated from individual daily counts. If you display a
+different window, calculate the baseline from historical totals of that same
+duration.
+
 The daily columns, `total` and baseline fields are ordinary data. Export them
 with the package required by the report, or pass the result to
 `islhr::islh_gt()` or `islhr::islh_flextable()`.

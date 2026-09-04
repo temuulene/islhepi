@@ -746,7 +746,10 @@ islh_surveillance_baseline <- function(
 #' @param periods Number of periods to show.
 #' @param interval Period spacing used to construct the window.
 #' @param week_start Start of an ordinary week, from 1 (Monday) to 7 (Sunday).
-#' @param baseline Optional result from [islh_surveillance_baseline()].
+#' @param baseline Optional result from [islh_surveillance_baseline()]. Its
+#'   limits must describe the same duration as the displayed `total`. For
+#'   example, a seven-day snapshot should use a baseline of historical
+#'   seven-day or weekly totals, not historical daily counts.
 #' @param include_total Add an `All` row. This is only available with one
 #'   grouping column and should only be used for mutually exclusive groups.
 #' @param total_label Label used for the total group.
