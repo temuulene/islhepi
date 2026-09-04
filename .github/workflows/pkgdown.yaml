@@ -41,7 +41,7 @@ jobs:
             curl --fail --location --retry 3 "${font_url}/${file}" --output "${asset_dir}/${file}"
             cp "${asset_dir}/${file}" "${system_dir}/${file}"
           done
-          curl --fail --location --retry 3 +            "https://raw.githubusercontent.com/bcgov/bc-sans/${font_ref}/LICENSE" +            --output "${asset_dir}/BC-Sans-LICENSE.txt"
+          curl --fail --location --retry 3 "https://raw.githubusercontent.com/bcgov/bc-sans/${font_ref}/LICENSE" --output "${asset_dir}/BC-Sans-LICENSE.txt"
           fc-cache -f
           Rscript -e 'stopifnot("BC Sans" %in% systemfonts::system_fonts()$family)'
       - name: Build site
