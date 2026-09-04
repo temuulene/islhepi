@@ -1,0 +1,29 @@
+url: https://github.com/temuulene/islhepi
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left: [intro, reference, news]
+
+reference:
+  - title: Rates and confidence intervals
+    desc: >
+      Calculate crude and directly standardised rates with explicit interval
+      methods and validated epidemiological inputs.
+    contents:
+      - islh_age_group
+      - islh_crude_rate
+      - islh_dsr
+      - islh_ci_poisson
+
+  - title: Disclosure control
+    desc: >
+      Mechanics, not policy. Thresholds and rounding bases must be supplied
+      explicitly for the release being prepared.
+    contents:
+      - islh_suppress
+      - islh_suppress_table
+      - islh_round_base
+

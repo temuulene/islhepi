@@ -1,0 +1,71 @@
+---
+title: "Getting started with islhepi"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with islhepi}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| include: false
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+`islhepi` provides small, validated functions for routine public health
+analysis. It is separate from `islhr`, which handles Island Health branding,
+tables and report scaffolding.
+
+## Rates
+
+```{r}
+library(islhepi)
+
+islh_crude_rate(cases = 12, population = 50000)
+```
+
+`islh_ci_poisson()` provides Byar and exact intervals. Byar is the default for
+continuity with existing analyses. Use the exact method for small counts when
+required by the governing analytical standard.
+
+```{r}
+islh_ci_poisson(c(0, 3, 25), method = "exact")
+```
+
+For age-standardised rates, pass one value per stratum and the chosen standard
+population. The function refuses missing strata because they would make the
+single summary rate incomplete.
+
+```{r}
+cases <- c(5, 12, 40, 80)
+population <- c(20000, 25000, 22000, 15000)
+standard <- c(30000, 30000, 25000, 15000)
+
+islh_dsr(cases, population, standard)
+```
+
+## Disclosure control
+
+There is deliberately no default suppression threshold or rounding base.
+Those are release-policy decisions and must be supplied explicitly.
+
+```{r}
+islh_suppress(c(0, 3, 42), threshold = 5)
+
+counts <- data.frame(
+  area = c("North", "Central", "South"),
+  cases = c(3, 42, 17)
+)
+islh_suppress_table(
+  counts,
+  "cases",
+  threshold = 5,
+  complementary = TRUE
+)
+```
+
+Complementary suppression in this helper operates independently within each
+selected column. It does not establish protection for multidimensional tables,
+linked releases or tables with several margins. Review those outputs against
+the applicable disclosure-control policy before release.
+
