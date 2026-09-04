@@ -93,6 +93,10 @@ islh_bc_sources <- function() {
 #' `sex = c("F", "M")` is the default because those rows can be summed without
 #' double counting. Total rows (`"T"`) must be requested on their own.
 #'
+#' Population resources cover all of BC. When mapping one health authority,
+#' join the population rows to the filtered object returned by
+#' [islh_bc_geography()] and allow unmatched population rows to be discarded.
+#'
 #' @param geography `"lha"` or `"hsda"`.
 #' @param years Optional numeric vector of years. `NULL` returns all years in
 #'   the resource.
@@ -202,10 +206,13 @@ islh_bc_geography <- function(
 
 .islh_fetch_bc_population <- function(record_id, resource_id) {
   .islh_with_bcdata_errors(
-    bcdata::bcdc_get_data(
-      record = record_id,
-      resource = resource_id,
-      verbose = FALSE
+    suppressMessages(
+      bcdata::bcdc_get_data(
+        record = record_id,
+        resource = resource_id,
+        verbose = FALSE,
+        show_col_types = FALSE
+      )
     )
   )
 }

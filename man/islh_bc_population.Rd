@@ -37,6 +37,10 @@ age group. The output is ready to join to \code{islh_bc_geography()} using
 \details{
 \code{sex = c("F", "M")} is the default because those rows can be summed
 without double counting. Total rows (\code{"T"}) must be requested on their own.
+
+Population resources cover all of BC. When mapping one health authority,
+join the population rows to the filtered object returned by
+\code{islh_bc_geography()} and allow unmatched population rows to be discarded.
 }
 \examples{
 \dontrun{

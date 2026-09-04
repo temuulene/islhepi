@@ -10,6 +10,8 @@
   availability.
 * Fixed the installation guidance when more than one optional data package is
   missing. It now reports every package and a runnable installation command.
+* Corrected the mapping example for provincial population data joined to the
+  default Island Health boundary subset, and quieted routine CSV parsing output.
 
 # islhepi 0.1.0
 

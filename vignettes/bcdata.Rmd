@@ -56,9 +56,10 @@ catalogue records.
 
 ## A checked population join
 
-Use the standardized geography type and code for a transparent join. A strict
-one-to-one relationship makes duplicate or unmatched areas fail before a map
-is drawn.
+Use the standardized geography type and code for a transparent join. The
+population resource covers all of BC, while the boundary helper defaults to
+Island Health. Extra population rows are therefore expected to be discarded.
+The one-to-one relationship still rejects duplicate geography codes.
 
 ```{r, eval=FALSE}
 lha_extract <- islh_bc_population("lha", years = 2025, sex = "T")
@@ -70,14 +71,19 @@ lha_total <- lha_extract |>
     .by = c(geography, geography_code, year, estimate_type)
   )
 
-lha_map_data <- inner_join(
-  islh_bc_geography("lha"),
+lha_boundaries <- islh_bc_geography("lha")
+
+lha_map_data <- left_join(
+  lha_boundaries,
   lha_total,
   by = join_by(geography, geography_code),
   relationship = "one-to-one",
-  unmatched = "error",
   na_matches = "never"
 )
+
+if (anyNA(lha_map_data$population)) {
+  stop("One or more Island Health boundaries did not match population data.")
+}
 ```
 
 Read the `bcdata_source` attribute immediately after download, or use

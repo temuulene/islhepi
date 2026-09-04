@@ -63,20 +63,25 @@ population <- population_extract |>
 
 boundaries <- islh_bc_geography("lha")
 
-map_data <- inner_join(
+map_data <- left_join(
   boundaries,
   population,
   by = join_by(geography, geography_code),
   relationship = "one-to-one",
-  unmatched = "error",
   na_matches = "never"
 )
+
+if (anyNA(map_data$population)) {
+  stop("One or more Island Health boundaries did not match population data.")
+}
 ```
 
 The default boundary filter uses the catalogue value `Vancouver Island`.
 `health_authority = "Island Health"` is accepted as an alias, and `NULL`
 returns all of BC. Use `islh_bc_sources()` to audit and cite the pinned record
-and resource identifiers. Network calls are never made when the package loads.
+and resource identifiers. Population resources cover all of BC, so population
+rows outside the filtered boundary object are expected to be discarded by the
+join. Network calls are never made when the package loads.
 
 Downloaded data are not bundled into releases. Save a dated extract in the
 analysis project when the governing reproducibility or retention standard
