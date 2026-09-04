@@ -38,3 +38,4 @@ VignetteBuilder: knitr
 URL: https://temuulene.github.io/islhepi/,
     https://github.com/temuulene/islhepi
 BugReports: https://github.com/temuulene/islhepi/issues
+Config/Needs/website: temuulene/islhr

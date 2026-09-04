@@ -1,0 +1,57 @@
+/*
+ * BC Sans web fonts from https://github.com/bcgov/bc-sans
+ * Licensed under the Apache License 2.0. The licence is published alongside
+ * the fonts in fonts/BC-Sans-LICENSE.txt.
+ */
+@font-face {
+  font-family: "BC Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("BC Sans Regular"), local("BC Sans"),
+       url("fonts/BCSans-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "BC Sans";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local("BC Sans Italic"),
+       url("fonts/BCSans-Italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "BC Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local("BC Sans Bold"),
+       url("fonts/BCSans-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "BC Sans";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: local("BC Sans Bold Italic"),
+       url("fonts/BCSans-BoldItalic.woff2") format("woff2");
+}
+
+:root {
+  --bs-body-font-family: "BC Sans", "Noto Sans", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+.navbar,
+.dropdown-menu,
+.tooltip,
+.popover {
+  font-family: var(--bs-body-font-family);
+}

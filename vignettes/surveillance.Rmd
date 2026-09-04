@@ -192,12 +192,19 @@ the unduplicated event data instead.
 `islhepi` intentionally returns data rather than imposing a figure style. Use
 `islhr::islh_epi_curve()` to create the Island Health figure:
 
-```{r plot-example, eval=FALSE}
+```{r plot-example, eval=requireNamespace("islhr", quietly = TRUE), fig.width=8, fig.height=4.5, fig.alt="Stacked weekly surveillance counts for Central, North and South sites."}
 islhr::islh_epi_curve(
   weekly,
   date = period_start,
   count = count,
   fill = site,
-  title = "Weekly surveillance counts"
+  labels = "total",
+  title = "Weekly surveillance counts",
+  subtitle = "Complete reporting periods include zero counts",
+  caption = "Source: simulated package example."
 )
 ```
+
+The published package website installs `islhr` and evaluates this example.
+When this vignette is built on a computer without `islhr`, only the plot is
+skipped; all analytical examples still run.

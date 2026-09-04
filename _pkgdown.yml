@@ -2,6 +2,9 @@ url: https://temuulene.github.io/islhepi/
 
 template:
   bootstrap: 5
+  bslib:
+    base_font: "BC Sans"
+    heading_font: "BC Sans"
 
 navbar:
   structure:
