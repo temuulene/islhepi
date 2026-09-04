@@ -31,5 +31,6 @@ Suggests:
     withr
 Config/testthat/edition: 3
 VignetteBuilder: knitr
-URL: https://github.com/temuulene/islhepi
+URL: https://temuulene.github.io/islhepi/,
+    https://github.com/temuulene/islhepi
 BugReports: https://github.com/temuulene/islhepi/issues

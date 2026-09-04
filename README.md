@@ -16,10 +16,11 @@ The package implements calculation mechanics, not analytic or disclosure
 policy. Confirm the appropriate threshold, standard population and interval
 method for every release.
 
+Documentation: <https://temuulene.github.io/islhepi/>
+
 ## Installing
 
-While this repository is private, installation requires a GitHub account with
-access and a personal access token:
+Install the development version from GitHub:
 
 ```r
 install.packages("remotes", type = "binary")
