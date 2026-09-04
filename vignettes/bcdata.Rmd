@@ -1,0 +1,98 @@
+---
+title: "BC population and geography data"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{BC population and geography data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| include: false
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+`islhepi` provides a controlled access layer around the BC Data Catalogue.
+Permanent record and resource identifiers are pinned in the package, downloaded
+objects use consistent join keys, and no request is made when the package loads.
+
+## Population denominators
+
+The population helper supports Local Health Areas and Health Service Delivery
+Areas. It reshapes one-year ages into the same age bands used by
+`islh_age_group()`.
+
+```{r, eval=FALSE}
+library(dplyr)
+library(islhepi)
+
+lha_population <- islh_bc_population(
+  geography = "lha",
+  years = 2021:2026,
+  sex = c("F", "M"),
+  age_breaks = "five_year"
+)
+```
+
+Female and male rows are returned separately. Summing them produces a total
+without double counting. Alternatively, request `sex = "T"` on its own when
+the catalogue total is required.
+
+## Health-geography boundaries
+
+The geography helper supports health authorities, HSDAs, LHAs and CHSAs. It
+returns an `sf` object in BC Albers by default and limits the result to Island
+Health.
+
+```{r, eval=FALSE}
+lha_boundaries <- islh_bc_geography("lha")
+
+# Use all provincial boundaries when needed.
+bc_chsa <- islh_bc_geography("chsa", health_authority = NULL)
+```
+
+`health_authority = "Island Health"` and `"Vancouver Island"` select the same
+catalogue records.
+
+## A checked population join
+
+Use the standardized geography type and code for a transparent join. A strict
+one-to-one relationship makes duplicate or unmatched areas fail before a map
+is drawn.
+
+```{r, eval=FALSE}
+lha_extract <- islh_bc_population("lha", years = 2025, sex = "T")
+lha_source <- attr(lha_extract, "bcdata_source")
+
+lha_total <- lha_extract |>
+  summarise(
+    population = sum(population),
+    .by = c(geography, geography_code, year, estimate_type)
+  )
+
+lha_map_data <- inner_join(
+  islh_bc_geography("lha"),
+  lha_total,
+  by = join_by(geography, geography_code),
+  relationship = "one-to-one",
+  unmatched = "error",
+  na_matches = "never"
+)
+```
+
+Read the `bcdata_source` attribute immediately after download, or use
+`islh_bc_sources()`, to record catalogue provenance. Attributes may be dropped
+by later data transformations, so persist source metadata explicitly when it
+must travel with an analytical extract.
+
+## Reproducible extracts
+
+The package retrieves current catalogue content and deliberately does not ship
+copied datasets. For a governed analysis, save the retrieved object in the
+project with its retrieval date and source metadata. Re-run the retrieval only
+when the analysis protocol permits the denominator or geography version to
+change.
+
+If a request fails on a health-authority network, verify that
+`catalogue.data.gov.bc.ca` is reachable through the configured proxy. The
+package does not modify `bcdata` internals or bypass its connectivity checks.

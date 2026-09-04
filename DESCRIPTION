@@ -1,12 +1,14 @@
 Package: islhepi
 Title: Epidemiological Methods for Island Health
-Version: 0.1.0
+Version: 0.2.0
 Authors@R:
     person("Temuulen", "Enebish", , "temuulen@gmail.com", role = c("aut", "cre"))
 Description: Provides validated helpers for common applied epidemiology
     tasks, including age grouping, crude and directly standardised rates,
     Poisson confidence intervals, small-cell suppression and count rounding.
-    Methods are explicit and designed for reproducible public health analysis.
+    It also retrieves standardized population denominators and health-geography
+    boundaries from pinned BC Data Catalogue records. Methods are explicit and
+    designed for reproducible public health analysis.
 License: file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -15,14 +17,19 @@ Depends:
     R (>= 4.1)
 Imports:
     cli,
-    stats
+    rlang,
+    stats,
+    utils
 Suggests:
+    bcdata (>= 0.5.3),
+    dplyr (>= 1.1.0),
     knitr,
     rmarkdown,
+    sf (>= 1.0.0),
     testthat (>= 3.0.0),
+    tidyr,
     withr
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 URL: https://github.com/temuulene/islhepi
 BugReports: https://github.com/temuulene/islhepi/issues
-

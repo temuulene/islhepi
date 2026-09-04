@@ -1,3 +1,14 @@
+# islhepi 0.2.0
+
+* Added `islh_bc_population()` for tidy LHA and HSDA population denominators
+  from pinned BC Stats resources through `bcdata`.
+* Added `islh_bc_geography()` for standardized HA, HSDA, LHA and CHSA `sf`
+  boundaries, with an Island Health default and stable character join keys.
+* Added `islh_bc_sources()` so reports can audit and cite the exact catalogue
+  records and resources.
+* Added mocked data-access tests. Package checks do not depend on live catalogue
+  availability.
+
 # islhepi 0.1.0
 
 First release of the Island Health analytical-methods package.
@@ -8,4 +19,3 @@ First release of the Island Health analytical-methods package.
 * Kept the existing input validation and regression tests with the methods.
 * Separated analytical methods from Island Health branding, table styling and
   Quarto report scaffolding.
-

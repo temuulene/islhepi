@@ -5,9 +5,23 @@ template:
 
 navbar:
   structure:
-    left: [intro, reference, news]
+    left: [intro, articles, reference, news]
+
+articles:
+  - title: Data access
+    contents:
+      - bcdata
 
 reference:
+  - title: BC population and geography
+    desc: >
+      Retrieve standardized denominators and boundaries from pinned BC Data
+      Catalogue sources.
+    contents:
+      - islh_bc_population
+      - islh_bc_geography
+      - islh_bc_sources
+
   - title: Rates and confidence intervals
     desc: >
       Calculate crude and directly standardised rates with explicit interval
@@ -26,4 +40,3 @@ reference:
       - islh_suppress
       - islh_suppress_table
       - islh_round_base
-
