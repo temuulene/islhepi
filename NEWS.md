@@ -1,3 +1,16 @@
+# islhepi 0.3.0
+
+* Added `islh_check_events()` for record-level review of missing identifiers,
+  invalid dates, duplicate identifiers and required-field gaps.
+* Added `islh_count_events()` for strict, zero-filled daily, weekly,
+  epidemiological-week, monthly, quarterly and annual event counts.
+* Added `islh_surveillance_baseline()` for explicit mean-SD, historical-range
+  and quantile reference limits, including an auditable finite-sample
+  adjustment.
+* Added `islh_surveillance_snapshot()` for current-window reporting tables with
+  stable date columns, totals and optional baseline comparisons.
+* Added an evaluated routine-surveillance guide using simulated event data.
+
 # islhepi 0.2.0
 
 * Added `islh_bc_population()` for tidy LHA and HSDA population denominators

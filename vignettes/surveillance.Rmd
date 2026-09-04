@@ -1,0 +1,197 @@
+---
+title: "Routine surveillance with islhepi"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Routine surveillance with islhepi}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+library(islhepi)
+```
+
+This guide demonstrates a small, complete workflow for daily or weekly
+surveillance. Every chunk is evaluated when the pkgdown site is built, so the
+tables below are actual package output.
+
+The package handles reusable mechanics. It does not decide case definitions,
+alert policy or the public-health response to a statistical exceedance.
+
+## Example event data
+
+The simulated line list has one row per encounter, a date, a site and a case
+classification.
+
+```{r event-data}
+set.seed(42)
+
+events <- data.frame(
+  encounter_id = sprintf("E%03d", 1:90),
+  event_date = as.Date("2026-06-01") + sample(0:41, 90, replace = TRUE),
+  site = sample(c("Central", "North", "South"), 90, replace = TRUE),
+  classification = sample(
+    c("Confirmed", "Probable"),
+    90,
+    replace = TRUE,
+    prob = c(0.8, 0.2)
+  )
+)
+
+head(events)
+```
+
+## Check the records first
+
+`islh_check_events()` returns one row for every problem. It does not alter the
+line list or remove affected records.
+
+```{r clean-event-check}
+islh_check_events(
+  events,
+  id = encounter_id,
+  date = event_date,
+  required = c(site, classification),
+  max_date = NULL
+)
+```
+
+A deliberately damaged example shows the review output:
+
+```{r issue-example}
+events_with_issues <- events[1:5, ]
+events_with_issues$encounter_id[2] <- events_with_issues$encounter_id[1]
+events_with_issues$event_date[3] <- NA
+events_with_issues$site[4] <- NA
+
+islh_check_events(
+  events_with_issues,
+  id = encounter_id,
+  date = event_date,
+  required = site,
+  max_date = NULL
+)
+```
+
+Use the `.row` values to display the affected source records to the data owner.
+
+## Create complete daily counts
+
+`groups` lists the sites that must appear even when a site has no events during
+the reporting window. `fill = TRUE` also creates days when nobody had an event.
+
+```{r daily-counts}
+daily <- islh_count_events(
+  events,
+  date = event_date,
+  id = encounter_id,
+  by = site,
+  interval = "day",
+  from = "2026-06-01",
+  to = "2026-07-12",
+  fill = TRUE,
+  groups = c("Central", "North", "South")
+)
+
+head(daily, 9)
+```
+
+For CDC epidemiological weeks, use `interval = "epiweek"`. ISO weeks use
+`"isoweek"`. For a locally anchored week, use `"week"` and provide
+`week_start`, where 1 is Monday and 7 is Sunday.
+
+```{r weekly-counts}
+weekly <- islh_count_events(
+  daily,
+  date = period_start,
+  count = count,
+  by = site,
+  interval = "week",
+  week_start = 1,
+  from = "2026-06-01",
+  to = "2026-07-12",
+  fill = TRUE
+)
+
+weekly
+```
+
+The result uses period start and end dates rather than a hand-built week number.
+That removes special January and December corrections from report scripts.
+
+## Calculate a transparent baseline
+
+This example uses the first four complete weeks as the reference period. Real
+reports should define the reference dates according to their approved method.
+
+```{r baseline}
+reference_weeks <- sort(unique(weekly$period_start))[1:4]
+
+baseline <- islh_surveillance_baseline(
+  weekly,
+  date = period_start,
+  value = count,
+  by = site,
+  reference_periods = reference_weeks,
+  method = "mean_sd",
+  multiplier = 2,
+  prediction_adjustment = TRUE,
+  minimum_periods = 4
+)
+
+baseline
+```
+
+`reference_n` and `reference_adjustment` make the calculation auditable. The
+adjustment is derived from the number of periods rather than hardcoded.
+`method = "range"` returns the historical minimum and maximum, while
+`method = "quantile"` uses the supplied probabilities.
+
+An observation above `upper_limit` is a statistical exceedance. The function
+does not label it an outbreak or decide whether action is required.
+
+## Build the current seven-day table
+
+```{r snapshot}
+snapshot <- islh_surveillance_snapshot(
+  daily,
+  date = period_start,
+  value = count,
+  by = site,
+  end = "2026-07-12",
+  periods = 7,
+  baseline = baseline,
+  include_total = FALSE
+)
+
+snapshot
+```
+
+The daily columns, `total` and baseline fields are ordinary data. Export them
+with the package required by the report, or pass the result to
+`islhr::islh_gt()` or `islhr::islh_flextable()`.
+
+Only use `include_total = TRUE` when the groups are mutually exclusive. If a
+record can contribute to more than one group, calculate the overall total from
+the unduplicated event data instead.
+
+## Plot the counts
+
+`islhepi` intentionally returns data rather than imposing a figure style. Use
+`islhr::islh_epi_curve()` to create the Island Health figure:
+
+```{r plot-example, eval=FALSE}
+islhr::islh_epi_curve(
+  weekly,
+  date = period_start,
+  count = count,
+  fill = site,
+  title = "Weekly surveillance counts"
+)
+```

@@ -12,15 +12,30 @@ navbar:
       menu:
         - text: Getting started
           href: articles/islhepi.html
+        - text: Routine surveillance
+          href: articles/surveillance.html
         - text: BC population and geography data
           href: articles/bcdata.html
 
 articles:
+  - title: Surveillance
+    contents:
+      - surveillance
   - title: Data access
     contents:
       - bcdata
 
 reference:
+  - title: Routine surveillance
+    desc: >
+      Check event records, build complete period counts, calculate transparent
+      historical baselines and prepare current-window reporting tables.
+    contents:
+      - islh_check_events
+      - islh_count_events
+      - islh_surveillance_baseline
+      - islh_surveillance_snapshot
+
   - title: BC population and geography
     desc: >
       Retrieve standardised denominators and boundaries from pinned BC Data
