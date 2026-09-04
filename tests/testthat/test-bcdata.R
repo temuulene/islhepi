@@ -21,7 +21,7 @@ test_that("population downloads become standardized age denominators", {
     Region.Name = c("Courtenay", "Courtenay", "BC", "East Kootenay"),
     Region.Type = c(
       "Local Health Area", "Local Health Area", "Local Health Area",
-      "Local Health Area"
+      "Health Service Delivery Area"
     ),
     Year = c(2025, 2025, 2025, 2025),
     Type = c("Estimate", "Estimate", "Estimate", "Estimate"),
