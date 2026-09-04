@@ -8,6 +8,8 @@
   records and resources.
 * Added mocked data-access tests. Package checks do not depend on live catalogue
   availability.
+* Fixed the installation guidance when more than one optional data package is
+  missing. It now reports every package and a runnable installation command.
 
 # islhepi 0.1.0
 

@@ -383,14 +383,17 @@ islh_bc_geography <- function(
     !vapply(packages, requireNamespace, logical(1), quietly = TRUE)
   ]
   if (length(missing) > 0L) {
+    package_word <- if (length(missing) == 1L) "package" else "packages"
+    pronoun <- if (length(missing) == 1L) "it" else "them"
+    missing_text <- paste(missing, collapse = ", ")
     command <- paste0(
       "install.packages(c(",
       paste(sprintf("\"%s\"", missing), collapse = ", "),
       "), type = \"binary\")"
     )
     .islh_abort(c(
-      "Missing package{?s} required for {feature}: {.pkg {missing}}.",
-      i = "Install {?it/them} with {.code {command}}."
+      "Missing {package_word} required for {feature}: {missing_text}.",
+      i = "Install {pronoun} with {.code {command}}."
     ))
   }
   invisible(TRUE)

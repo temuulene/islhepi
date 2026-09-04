@@ -170,3 +170,16 @@ test_that("bcdata network failures preserve the underlying reason", {
     "proxy unavailable"
   )
 })
+
+test_that("missing data packages produce an actionable error", {
+  packages <- c("islhepi_missing_one", "islhepi_missing_two")
+
+  expect_error(
+    islhepi:::.islh_require_packages(packages, "test data"),
+    paste0(
+      "Missing packages required for test data: ",
+      "islhepi_missing_one, islhepi_missing_two"
+    ),
+    fixed = TRUE
+  )
+})
