@@ -7,65 +7,180 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r}
-#| include: false
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+library(islhepi)
 ```
 
 `islhepi` provides small, validated functions for routine public health
-analysis. It is separate from `islhr`, which handles Island Health branding,
-tables and report scaffolding.
+analysis. Every example on this page is evaluated when the website is built,
+so the printed values are actual package output.
 
-## Rates
+The package implements calculation mechanics. It does not choose the
+suppression threshold, standard population or interval method for a release.
 
-```{r}
-library(islhepi)
+## Choose the function
 
-islh_crude_rate(cases = 12, population = 50000)
+| Task | Function | Output |
+|---|---|---|
+| Group individual ages | `islh_age_group()` | Ordered factor |
+| Calculate a crude rate | `islh_crude_rate()` | Data frame with rate and interval |
+| Calculate a Poisson count interval | `islh_ci_poisson()` | Data frame with lower and upper limits |
+| Calculate a directly standardised rate | `islh_dsr()` | One-row data frame |
+| Hide small counts | `islh_suppress()` | Numeric or labelled character vector |
+| Apply suppression to a table | `islh_suppress_table()` | Updated data frame |
+| Round counts | `islh_round_base()` | Numeric vector |
+| Retrieve BC denominators | `islh_bc_population()` | Tidy population table |
+| Retrieve BC boundaries | `islh_bc_geography()` | Standardised `sf` object |
+
+## Group ages
+
+The result is an ordered factor, which preserves the correct order in tables
+and plots.
+
+```{r age-groups}
+people <- data.frame(age = c(0, 4, 18, 42, 67, 91, NA))
+people$age_group <- islh_age_group(people$age, breaks = "broad")
+people
 ```
 
-`islh_ci_poisson()` provides Byar and exact intervals. Byar is the default for
-continuity with existing analyses. Use the exact method for small counts when
-required by the governing analytical standard.
+Built-in choices are `"five_year"`, `"phac"` and `"broad"`. A local set of
+lower bounds also works:
 
-```{r}
-islh_ci_poisson(c(0, 3, 25), method = "exact")
+```{r custom-age-groups}
+islh_age_group(c(2, 17, 42, 91), breaks = c(0, 18, 65))
 ```
 
-For age-standardised rates, pass one value per stratum and the chosen standard
-population. The function refuses missing strata because they would make the
-single summary rate incomplete.
+Negative and missing ages become `NA`. Check those rows before calculating a
+rate rather than silently dropping them.
 
-```{r}
-cases <- c(5, 12, 40, 80)
-population <- c(20000, 25000, 22000, 15000)
-standard <- c(30000, 30000, 25000, 15000)
+## Crude rates
 
-islh_dsr(cases, population, standard)
-```
+`islh_crude_rate()` returns the numerator and denominator beside the estimate
+and confidence limits, making the calculation easy to audit.
 
-## Disclosure control
-
-There is deliberately no default suppression threshold or rounding base.
-Those are release-policy decisions and must be supplied explicitly.
-
-```{r}
-islh_suppress(c(0, 3, 42), threshold = 5)
-
-counts <- data.frame(
-  area = c("North", "Central", "South"),
-  cases = c(3, 42, 17)
+```{r crude-rate}
+crude <- islh_crude_rate(
+  cases = c(12, 45),
+  population = c(50000, 120000),
+  per = 100000,
+  method = "exact"
 )
+round(crude, 1)
+```
+
+Read the first row as: 12 events in a population of 50,000, expressed per
+100,000 people, with the chosen Poisson interval. Counts may exceed the
+denominator when the numerator contains repeat events and the denominator is
+person-time.
+
+## Poisson count intervals
+
+```{r poisson-intervals}
+round(islh_ci_poisson(c(0, 3, 25), method = "exact"), 2)
+```
+
+Use `method = "exact"` for small counts when required by the analytical
+standard. `"byar"` is an approximation and falls back to the exact upper
+limit when the count is zero.
+
+## Directly standardised rates
+
+Pass one value per age stratum. All three vectors must be aligned in the same
+order.
+
+```{r standardised-rate}
+age_specific <- data.frame(
+  age_group = c("0-19", "20-44", "45-64", "65+"),
+  cases = c(5, 12, 40, 80),
+  population = c(20000, 25000, 22000, 15000),
+  standard_population = c(30000, 30000, 25000, 15000)
+)
+
+dsr <- with(
+  age_specific,
+  islh_dsr(cases, population, standard_population)
+)
+round(dsr, 1)
+```
+
+The returned `population` is the total observed denominator. The standard
+population is converted to weights and is not added to the result.
+`method = "gamma"` uses the Fay-Feuer interval; `"normal"` is available for
+comparison with analyses that explicitly require it.
+
+## Suppress small cells
+
+There is deliberately no default threshold. Supply the approved rule for the
+specific release.
+
+```{r suppress-vector}
+counts <- c(0, 3, 5, 17, 42)
+islh_suppress(counts, threshold = 5, label = "Suppressed")
+```
+
+Zero is kept because it is an observed absence, not a small positive count.
+With the default `inclusive = TRUE`, both 3 and 5 are suppressed.
+
+For a table:
+
+```{r suppress-table}
+area_counts <- data.frame(
+  area = c("North", "Central", "South"),
+  cases = c(3, 42, 17),
+  contacts = c(1, 55, 4)
+)
+
 islh_suppress_table(
-  counts,
-  "cases",
+  area_counts,
+  cols = c("cases", "contacts"),
   threshold = 5,
+  label = "Suppressed"
+)
+```
+
+Complementary suppression can hide a second cell when one hidden value could
+be recovered from a visible total:
+
+```{r complementary-suppression}
+islh_suppress_table(
+  area_counts,
+  cols = "cases",
+  threshold = 5,
+  label = "Suppressed",
   complementary = TRUE
 )
 ```
 
-Complementary suppression in this helper operates independently within each
-selected column. It does not establish protection for multidimensional tables,
-linked releases or tables with several margins. Review those outputs against
-the applicable disclosure-control policy before release.
+This helper works independently within each selected column. It does not prove
+that a multidimensional or linked release is protected.
 
+## Round counts
+
+```{r deterministic-rounding}
+islh_round_base(c(0, 2, 3, 7, 12, 43), base = 5)
+```
+
+Deterministic rounding returns the same values each time. Random rounding is
+unbiased over repeated use but varies between runs. Set a seed, round once and
+save the released values:
+
+```{r random-rounding}
+set.seed(42)
+islh_round_base(c(2, 3, 7, 12), base = 5, method = "random")
+```
+
+## Population and geography data
+
+The BC Data Catalogue helpers require a network request and are documented in
+[BC population and geography data](bcdata.html). That article shows the exact
+returned columns, representative output, a checked join and troubleshooting
+for unmatched rows.
+
+Use `islhr` after the calculation when the result needs an Island Health
+figure, table or Quarto report.

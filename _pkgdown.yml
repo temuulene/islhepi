@@ -6,6 +6,14 @@ template:
 navbar:
   structure:
     left: [intro, articles, reference, news]
+  components:
+    articles:
+      text: Guides
+      menu:
+        - text: Getting started
+          href: articles/islhepi.html
+        - text: BC population and geography data
+          href: articles/bcdata.html
 
 articles:
   - title: Data access
@@ -15,8 +23,8 @@ articles:
 reference:
   - title: BC population and geography
     desc: >
-      Retrieve standardized denominators and boundaries from pinned BC Data
-      Catalogue sources.
+      Retrieve standardised denominators and boundaries from pinned BC Data
+      Catalogue sources, with consistent keys for checked joins.
     contents:
       - islh_bc_population
       - islh_bc_geography
@@ -24,8 +32,8 @@ reference:
 
   - title: Rates and confidence intervals
     desc: >
-      Calculate crude and directly standardised rates with explicit interval
-      methods and validated epidemiological inputs.
+      Group ages and calculate crude or directly standardised rates with
+      explicit interval methods and validated inputs.
     contents:
       - islh_age_group
       - islh_crude_rate
@@ -34,8 +42,8 @@ reference:
 
   - title: Disclosure control
     desc: >
-      Mechanics, not policy. Thresholds and rounding bases must be supplied
-      explicitly for the release being prepared.
+      Apply suppression or rounding mechanics. Thresholds and rounding bases
+      must be supplied explicitly for the release being prepared.
     contents:
       - islh_suppress
       - islh_suppress_table

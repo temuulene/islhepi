@@ -51,6 +51,8 @@
 #'
 #' @return A data frame with source type, geography, record ID, optional
 #'   resource ID and catalogue URL.
+#' @examples
+#' islh_bc_sources()
 #' @export
 islh_bc_sources <- function() {
   population <- data.frame(

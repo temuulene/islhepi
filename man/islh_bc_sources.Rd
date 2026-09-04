@@ -15,3 +15,6 @@ Returns the permanent BC Data Catalogue record and resource identifiers used
 by \code{islh_bc_population()} and \code{islh_bc_geography()}. Use this table
 to audit or cite the source of a downloaded extract.
 }
+\examples{
+islh_bc_sources()
+}

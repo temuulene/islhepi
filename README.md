@@ -18,6 +18,10 @@ method for every release.
 
 Documentation: <https://temuulene.github.io/islhepi/>
 
+New users should start with
+[Getting started with islhepi](https://temuulene.github.io/islhepi/articles/islhepi.html).
+Every example in that article is evaluated and displays the returned values.
+
 ## Installing
 
 Install the development version from GitHub:
@@ -35,6 +39,17 @@ install.packages("path/to/islhepi_0.2.0.zip", repos = NULL)
 ```
 
 ## Using it
+
+Choose the function by the result you need:
+
+| Task | Function |
+|---|---|
+| Group ages | `islh_age_group()` |
+| Crude or directly standardised rates | `islh_crude_rate()`, `islh_dsr()` |
+| Poisson count intervals | `islh_ci_poisson()` |
+| Suppression | `islh_suppress()`, `islh_suppress_table()` |
+| Count rounding | `islh_round_base()` |
+| BC population and boundaries | `islh_bc_population()`, `islh_bc_geography()` |
 
 ```r
 library(islhepi)

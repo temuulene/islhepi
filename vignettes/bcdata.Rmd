@@ -7,14 +7,30 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r}
+```{r setup, include=FALSE}
 #| include: false
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+library(dplyr)
+library(islhepi)
 ```
 
 `islhepi` provides a controlled access layer around the BC Data Catalogue.
 Permanent record and resource identifiers are pinned in the package, downloaded
 objects use consistent join keys, and no request is made when the package loads.
+
+## Confirm the pinned sources
+
+`islh_bc_sources()` does not make a network request. It lists the exact
+catalogue records and resources the package will use.
+
+```{r sources}
+islh_bc_sources()
+```
 
 ## Population denominators
 
@@ -22,10 +38,7 @@ The population helper supports Local Health Areas and Health Service Delivery
 Areas. It reshapes one-year ages into the same age bands used by
 `islh_age_group()`.
 
-```{r, eval=FALSE}
-library(dplyr)
-library(islhepi)
-
+```{r download-population, eval=FALSE}
 lha_population <- islh_bc_population(
   geography = "lha",
   years = 2021:2026,
@@ -38,13 +51,46 @@ Female and male rows are returned separately. Summing them produces a total
 without double counting. Alternatively, request `sex = "T"` on its own when
 the catalogue total is required.
 
+The downloaded object has eight columns. The following representative rows are
+created locally so the website can show the shape without relying on a live
+catalogue request. The values are illustrative.
+
+```{r population-shape}
+population_example <- data.frame(
+  geography = rep("lha", 6),
+  geography_code = c("111", "111", "111", "112", "112", "112"),
+  geography_name = c(rep("Fernie", 3), rep("Cranbrook", 3)),
+  year = rep(2025L, 6),
+  estimate_type = rep("Estimate", 6),
+  sex = rep("T", 6),
+  age_group = factor(
+    rep(c("0-4", "5-9", "10-14"), 2),
+    levels = c("0-4", "5-9", "10-14"),
+    ordered = TRUE
+  ),
+  population = c(840, 1095, 1198, 1380, 1510, 1475)
+)
+population_example
+```
+
+To obtain one total per geography, sum over age groups:
+
+```{r population-total}
+population_total <- population_example |>
+  summarise(
+    population = sum(population),
+    .by = c(geography, geography_code, geography_name, year, estimate_type)
+  )
+population_total
+```
+
 ## Health-geography boundaries
 
 The geography helper supports health authorities, HSDAs, LHAs and CHSAs. It
 returns an `sf` object in BC Albers by default and limits the result to Island
 Health.
 
-```{r, eval=FALSE}
+```{r download-boundaries, eval=FALSE}
 lha_boundaries <- islh_bc_geography("lha")
 
 # Use all provincial boundaries when needed.
@@ -54,6 +100,16 @@ bc_chsa <- islh_bc_geography("chsa", health_authority = NULL)
 `health_authority = "Island Health"` and `"Vancouver Island"` select the same
 catalogue records.
 
+The returned object contains these analysis columns plus its `sf` geometry:
+
+| Column | Meaning | Example |
+|---|---|---|
+| `geography` | Stable geography type | `"lha"` |
+| `geography_code` | Zero-padded join key | `"414"` |
+| `geography_name` | Display name | `"Southern Gulf Islands"` |
+| `health_authority_name` | Catalogue authority name | `"Vancouver Island"` |
+| `geometry` | Boundary in the requested CRS | `MULTIPOLYGON` |
+
 ## A checked population join
 
 Use the standardized geography type and code for a transparent join. The
@@ -61,7 +117,7 @@ population resource covers all of BC, while the boundary helper defaults to
 Island Health. Extra population rows are therefore expected to be discarded.
 The one-to-one relationship still rejects duplicate geography codes.
 
-```{r, eval=FALSE}
+```{r checked-live-join, eval=FALSE}
 lha_extract <- islh_bc_population("lha", years = 2025, sex = "T")
 lha_source <- attr(lha_extract, "bcdata_source")
 
@@ -86,6 +142,42 @@ if (anyNA(lha_map_data$population)) {
 }
 ```
 
+Use the boundary object on the left of the join. Population data cover all of
+BC, while the default boundaries contain only Island Health. A join that
+requires every population row to match will therefore fail by design.
+
+The same key check can be demonstrated without geometry:
+
+```{r checked-example-join}
+boundary_keys <- data.frame(
+  geography = c("lha", "lha"),
+  geography_code = c("111", "112"),
+  geography_name = c("Fernie", "Cranbrook")
+)
+
+joined_example <- left_join(
+  boundary_keys,
+  population_total,
+  by = join_by(geography, geography_code),
+  relationship = "one-to-one",
+  na_matches = "never"
+)
+joined_example
+```
+
+```{r unmatched-check}
+anti_join(
+  boundary_keys,
+  population_total,
+  by = join_by(geography, geography_code),
+  na_matches = "never"
+)
+```
+
+An empty result from `anti_join()` means every requested boundary has a
+population match. If rows appear, inspect code padding, geography type, year
+and estimate type before mapping.
+
 Read the `bcdata_source` attribute immediately after download, or use
 `islh_bc_sources()`, to record catalogue provenance. Attributes may be dropped
 by later data transformations, so persist source metadata explicitly when it
@@ -102,3 +194,20 @@ change.
 If a request fails on a health-authority network, verify that
 `catalogue.data.gov.bc.ca` is reachable through the configured proxy. The
 package does not modify `bcdata` internals or bypass its connectivity checks.
+
+## Common questions
+
+**Why did requesting `sex = "T"` still return F and M rows?** Update
+`islhepi` and restart R so the installed namespace matches the current
+package. Then inspect `unique(result$sex)`.
+
+**Why are there more population areas than boundaries?** Population resources
+cover the province. The default boundary query filters to Island Health.
+
+**Why did a one-to-one join reject the data?** Population output has one row
+per age group and sex. Aggregate to one row per geography first, as shown
+above.
+
+**How do I reproduce a published map later?** Save the downloaded objects,
+their `bcdata_source` attributes and the extraction date in the analysis
+project.
