@@ -17,7 +17,8 @@ islh_dsr(
 \item{cases}{Non-negative whole event counts per stratum. Counts may exceed
 the corresponding denominator when events can recur.}
 
-\item{population}{Population or person-time at risk per stratum.}
+\item{population}{Population or person-time at risk per stratum. Must be
+positive; see the zero-denominator section.}
 
 \item{std_population}{Standard population per stratum. Only the relative
 sizes matter; they are normalised to weights internally.}
@@ -43,7 +44,24 @@ nominal coverage when a few strata dominate the weighted variance, which is
 the usual situation with age-standardised rates and small counts, where a
 normal-approximation interval is too narrow and can fall below zero.
 \code{"normal"} is provided for comparison with published figures that used it.
+
+Fay and Feuer's interval is exact whenever the standard population is
+proportional to the study population: with those weights it reduces to the
+exact Poisson interval on the pooled count. A regression test checks that
+property across several strata.
 }
+\section{Zero denominators}{
+
+
+A stratum with a zero denominator is refused, for the reason given in the
+zero-denominator section of \code{\link[=islh_crude_rate]{islh_crude_rate()}}. A standardised rate is one
+number summed over every stratum, so decide what an empty stratum means and
+drop or combine it before standardising rather than after.
+
+A zero \emph{standard} population is allowed. It gives the stratum a weight of
+zero, which is how a standard population legitimately excludes an age band.
+}
+
 \examples{
 cases <- c(5, 12, 40, 80)
 population <- c(20000, 25000, 22000, 15000)
@@ -60,5 +78,3 @@ Fay MP, Feuer EJ (1997). Confidence intervals for directly standardized
 rates: a method based on the gamma distribution.
 \emph{Statistics in Medicine} 16(7):791-801.
 }
-
-

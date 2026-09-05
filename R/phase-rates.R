@@ -4,7 +4,17 @@
 # are defensible defaults, not Island Health policy: confirm with PHASE that
 # they match the standard your release is governed by.
 
+# Below this count Byar's approximation drifts far enough to matter, so
+# `method = "auto"` uses the exact interval instead. The cutoff is the one
+# named in the Byar documentation: the approximation is accurate for counts of
+# roughly 10 or more.
+.islh_byar_minimum <- 10
+
 #' Confidence interval for a Poisson count
+#'
+#' `"auto"` is the default. It uses the exact interval for counts below 10
+#' and Byar's approximation at or above 10, which is the choice most
+#' analysts would make by hand.
 #'
 #' `"byar"` uses Byar's approximation, the method Statistics Canada and most
 #' cancer registries use for rate intervals. It is accurate for counts of
@@ -17,11 +27,20 @@
 #' Byar's approximation is undefined at zero, so a count of zero uses the exact
 #' interval whichever method you ask for.
 #'
+#' @section Choosing a method by hand:
+#'
+#' Pick `"byar"` or `"exact"` explicitly when a release has to match a
+#' published series that used one method throughout. `"auto"` mixes the two
+#' within a single column, which is the right statistical choice but makes the
+#' method a property of each row rather than of the table. Say which method you
+#' used in the table notes either way.
+#'
 #' @param x Observed counts.
 #' @param conf Confidence level.
-#' @param method `"byar"` or `"exact"`.
+#' @param method `"auto"`, `"byar"` or `"exact"`.
 #'
-#' @return A data frame with columns `x`, `lower` and `upper`.
+#' @return A data frame with columns `x`, `lower`, `upper` and `method`, where
+#'   `method` records the method actually used for that count.
 #' @export
 #'
 #' @references
@@ -33,7 +52,8 @@
 #'
 #' # Small counts are where the two methods disagree.
 #' islh_ci_poisson(3, method = "exact")
-islh_ci_poisson <- function(x, conf = 0.95, method = c("byar", "exact")) {
+#' islh_ci_poisson(3, method = "byar")
+islh_ci_poisson <- function(x, conf = 0.95, method = c("auto", "byar", "exact")) {
   method <- match.arg(method)
   conf <- .islh_check_conf(conf)
   x <- .islh_check_counts(x, arg = "x")
@@ -47,22 +67,29 @@ islh_ci_poisson <- function(x, conf = 0.95, method = c("byar", "exact")) {
     stats::qchisq(1 - alpha / 2, 2 * (x + 1)) / 2
   }
 
-  if (method == "exact") {
-    return(data.frame(x = x, lower = exact_lower(x), upper = exact_upper(x)))
+  # Which method applies to each count? Byar's is undefined at zero, so a zero
+  # always takes the exact interval whichever method was asked for.
+  used <- rep(method, length(x))
+  if (method == "auto") {
+    used <- ifelse(x < .islh_byar_minimum, "exact", "byar")
+  }
+  used[!is.na(x) & x == 0] <- "exact"
+  used[is.na(x)] <- NA_character_
+
+  lower <- exact_lower(x)
+  upper <- exact_upper(x)
+
+  byar <- !is.na(used) & used == "byar"
+  if (any(byar)) {
+    z <- stats::qnorm(1 - alpha / 2)
+    b <- x[byar]
+    # Byar's approximation, via the cube-root (Wilson-Hilferty) transformation
+    # of the chi-squared distribution.
+    lower[byar] <- pmax(b * (1 - 1 / (9 * b) - z / (3 * sqrt(b)))^3, 0)
+    upper[byar] <- (b + 1) * (1 - 1 / (9 * (b + 1)) + z / (3 * sqrt(b + 1)))^3
   }
 
-  z <- stats::qnorm(1 - alpha / 2)
-  # Byar's approximation, via the cube-root (Wilson-Hilferty) transformation
-  # of the chi-squared distribution.
-  lower <- x * (1 - 1 / (9 * x) - z / (3 * sqrt(x)))^3
-  upper <- (x + 1) * (1 - 1 / (9 * (x + 1)) + z / (3 * sqrt(x + 1)))^3
-
-  # Byar's is undefined at zero; fall back to the exact interval there.
-  zero <- !is.na(x) & x == 0
-  lower[zero] <- 0
-  upper[zero] <- exact_upper(0)
-
-  data.frame(x = x, lower = pmax(lower, 0), upper = upper)
+  data.frame(x = x, lower = lower, upper = upper, method = used)
 }
 
 #' Crude rate with a confidence interval
@@ -72,14 +99,29 @@ islh_ci_poisson <- function(x, conf = 0.95, method = c("byar", "exact")) {
 #' scaled the same way. Counts may exceed the denominator when people can
 #' experience more than one event.
 #'
+#' @section Zero denominators:
+#'
+#' A zero denominator is refused rather than divided by. Nobody is at risk in
+#' such a stratum, so it has no rate at all, and dividing by it would put `Inf`
+#' or `NaN` into a published table.
+#'
+#' Zero denominators are real values and reach you legitimately: a small local
+#' health area can have an age band with nobody in it, and
+#' [islh_bc_population()] keeps those rows rather than dropping them. Decide
+#' what they mean before calculating. Usually you either drop those strata,
+#' which reports no rate where no rate exists, or combine them with a
+#' neighbouring age band or area, which reports a rate over a denominator large
+#' enough to carry one. Say which you did in the table notes.
+#'
 #' @param cases Non-negative whole event counts.
 #' @param population Population or person-time at risk. Recycled if length 1.
+#'   Must be positive; see the zero-denominator section.
 #' @param per Rate denominator. 100,000 by convention in public health.
 #' @param conf Confidence level.
 #' @param method Interval method passed to [islh_ci_poisson()].
 #'
-#' @return A data frame with columns `cases`, `population`, `rate`, `lower`
-#'   and `upper`.
+#' @return A data frame with columns `cases`, `population`, `rate`, `lower`,
+#'   `upper` and `method`.
 #' @export
 #'
 #' @examples
@@ -89,7 +131,7 @@ islh_crude_rate <- function(
   population,
   per = 100000,
   conf = 0.95,
-  method = c("byar", "exact")
+  method = c("auto", "byar", "exact")
 ) {
   method <- match.arg(method)
   conf <- .islh_check_conf(conf)
@@ -115,7 +157,8 @@ islh_crude_rate <- function(
     population = population,
     rate = cases * scale,
     lower = ci$lower * scale,
-    upper = ci$upper * scale
+    upper = ci$upper * scale,
+    method = ci$method
   )
 }
 
@@ -130,9 +173,25 @@ islh_crude_rate <- function(
 #' normal-approximation interval is too narrow and can fall below zero.
 #' `"normal"` is provided for comparison with published figures that used it.
 #'
+#' Fay and Feuer's interval is exact whenever the standard population is
+#' proportional to the study population: with those weights it reduces to the
+#' exact Poisson interval on the pooled count. A regression test checks that
+#' property across several strata.
+#'
+#' @section Zero denominators:
+#'
+#' A stratum with a zero denominator is refused, for the reason given in the
+#' zero-denominator section of [islh_crude_rate()]. A standardised rate is one
+#' number summed over every stratum, so decide what an empty stratum means and
+#' drop or combine it before standardising rather than after.
+#'
+#' A zero *standard* population is allowed. It gives the stratum a weight of
+#' zero, which is how a standard population legitimately excludes an age band.
+#'
 #' @param cases Non-negative whole event counts per stratum. Counts may exceed
 #'   the corresponding denominator when events can recur.
-#' @param population Population or person-time at risk per stratum.
+#' @param population Population or person-time at risk per stratum. Must be
+#'   positive; see the zero-denominator section.
 #' @param std_population Standard population per stratum. Only the relative
 #'   sizes matter; they are normalised to weights internally.
 #' @param per Rate denominator.

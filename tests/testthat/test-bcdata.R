@@ -183,3 +183,40 @@ test_that("missing data packages produce an actionable error", {
     fixed = TRUE
   )
 })
+
+test_that("a genuine zero population is kept rather than dropped", {
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("tidyr")
+
+  # A small local health area with nobody in an age band. That is a real
+  # measurement, not a gap: dropping the row would turn a complete denominator
+  # table into an incomplete one, and a later join would report a missing
+  # population that looks like a failed download.
+  raw <- data.frame(
+    Region = c(71, 71),
+    Region.Name = c("Courtenay", "Courtenay"),
+    Region.Type = c("Local Health Area", "Local Health Area"),
+    Year = c(2025, 2025),
+    Type = c("Estimate", "Estimate"),
+    Gender = c("F", "M"),
+    check.names = FALSE
+  )
+  raw[["0"]] <- c(0, 11)
+  raw[["5"]] <- c(30, 0)
+  raw[["90+"]] <- c(0, 0)
+
+  out <- islhepi:::.islh_tidy_bc_population(
+    raw, "lha", 2025, c("F", "M"), c(0, 5, 85), NULL
+  )
+
+  expect_equal(nrow(out), 6L)
+  expect_setequal(as.character(out$age_group), c("0-4", "5-84", "85+"))
+
+  female <- out[out$sex == "F", ]
+  expect_equal(female$population[female$age_group == "0-4"], 0)
+  expect_equal(female$population[female$age_group == "85+"], 0)
+  expect_equal(female$population[female$age_group == "5-84"], 30)
+
+  # Every age band is present for both sexes, zero or not.
+  expect_equal(sum(out$population == 0), 4L)
+})

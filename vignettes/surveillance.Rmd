@@ -153,8 +153,11 @@ adjustment is derived from the number of periods rather than hardcoded.
 `method = "range"` returns the historical minimum and maximum, while
 `method = "quantile"` uses the supplied probabilities.
 
-An observation above `upper_limit` is a statistical exceedance. The function
-does not label it an outbreak or decide whether action is required.
+A total at or above `upper_limit` is a statistical exceedance. The boundary is
+inclusive on purpose: with `method = "range"` the limit is the historical
+maximum, so a current total lands exactly on it regularly, and a total that has
+matched the highest value ever recorded is worth reviewing. The function does
+not label it an outbreak or decide whether action is required.
 
 ## Build the current seven-day table
 
@@ -174,10 +177,18 @@ snapshot
 ```
 
 The seven displayed daily counts add to one weekly total, so the weekly
-baseline above is comparable with `total`. Do not compare a seven-day total
-with a baseline calculated from individual daily counts. If you display a
-different window, calculate the baseline from historical totals of that same
-duration.
+baseline above is comparable with `total`. A seven-day total must not be
+compared with a baseline calculated from individual daily counts, and the
+function refuses to: both tables carry the reporting period they were built
+with, and mismatched durations stop with an error rather than producing a table
+whose limits are seven times too small. If you display a different window,
+calculate the baseline from historical totals of that same duration.
+
+Metadata travels on the result as attributes, and subsetting a data frame drops
+them. If you reshape a table between steps, name the reporting period
+explicitly: pass `interval` to `islh_surveillance_baseline()`, or
+`baseline_interval` to `islh_surveillance_snapshot()` for limits that came from
+somewhere else entirely, such as last season's totals held in a spreadsheet.
 
 The daily columns, `total` and baseline fields are ordinary data. Export them
 with the package required by the report, or pass the result to

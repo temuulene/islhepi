@@ -1,6 +1,6 @@
 Package: islhepi
 Title: Epidemiological Methods for Island Health
-Version: 0.3.0
+Version: 0.4.0
 Authors@R:
     person("Temuulen", "Enebish", , "temuulen@gmail.com", role = c("aut", "cre"))
 Description: Provides validated helpers for common applied epidemiology

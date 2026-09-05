@@ -244,6 +244,7 @@ test_that("snapshot fills dates, totals rows and joins baselines", {
     by = site,
     periods = 7,
     baseline = baseline,
+    baseline_interval = "week",
     include_total = TRUE
   )
 
@@ -296,8 +297,250 @@ test_that("snapshot prevents ambiguous totals and baselines", {
       date,
       count,
       by = site,
-      baseline = baseline
+      baseline = baseline,
+      baseline_interval = "week"
     ),
     "one row per group"
   )
+})
+
+# Reporting-period metadata --------------------------------------------------
+
+surv_daily <- function(n = 28, start = "2026-06-01") {
+  data.frame(
+    site = rep(c("A", "B"), each = n),
+    date = rep(seq(as.Date(start), by = "day", length.out = n), 2),
+    count = rep(c(1, 2, 0, 3, 2, 1, 4), length.out = 2 * n)
+  )
+}
+
+test_that("count_events records the interval and window it was built with", {
+  counts <- islh_count_events(
+    surv_daily(),
+    date = date,
+    by = site,
+    count = count,
+    interval = "week",
+    week_start = 1
+  )
+
+  expect_equal(attr(counts, "islh_interval"), "week")
+  expect_equal(attr(counts, "islh_week_start"), 1L)
+  expect_equal(attr(counts, "islh_periods"), 1L)
+  expect_equal(attr(counts, "islh_from"), as.Date("2026-06-01"))
+  expect_equal(attr(counts, "islh_to"), as.Date("2026-06-28"))
+})
+
+test_that("a baseline carries the duration its limits describe", {
+  weekly <- islh_count_events(
+    surv_daily(),
+    date = date,
+    by = site,
+    count = count,
+    interval = "week"
+  )
+  baseline <- islh_surveillance_baseline(weekly, period_start, count, by = site)
+
+  expect_equal(attr(baseline, "islh_interval"), "week")
+  expect_equal(attr(baseline, "islh_periods"), 1L)
+})
+
+test_that("a baseline infers its interval from date spacing alone", {
+  # A table built by hand carries no metadata, but its dates are still evenly
+  # spaced, so the reporting period is recoverable.
+  weekly <- data.frame(
+    week = seq(as.Date("2026-01-05"), by = "week", length.out = 8),
+    count = c(2, 4, 3, 5, 2, 4, 3, 5)
+  )
+  baseline <- islh_surveillance_baseline(weekly, week, count)
+  expect_equal(attr(baseline, "islh_interval"), "week")
+
+  monthly <- data.frame(
+    month = seq(as.Date("2026-01-01"), by = "month", length.out = 8),
+    count = c(2, 4, 3, 5, 2, 4, 3, 5)
+  )
+  expect_equal(
+    attr(islh_surveillance_baseline(monthly, month, count), "islh_interval"),
+    "month"
+  )
+})
+
+test_that("an explicit baseline interval must agree with the recorded one", {
+  weekly <- islh_count_events(
+    surv_daily(),
+    date = date,
+    by = site,
+    count = count,
+    interval = "week"
+  )
+
+  expect_error(
+    islh_surveillance_baseline(
+      weekly, period_start, count, by = site, interval = "day"
+    ),
+    "does not match the reporting period"
+  )
+  expect_silent(
+    islh_surveillance_baseline(
+      weekly, period_start, count, by = site, interval = "isoweek"
+    )
+  )
+})
+
+test_that("a daily baseline is refused for a seven-day snapshot", {
+  daily <- islh_count_events(
+    surv_daily(),
+    date = date,
+    by = site,
+    count = count,
+    interval = "day"
+  )
+  daily_baseline <- islh_surveillance_baseline(
+    daily, period_start, count, by = site
+  )
+
+  # The failure the metadata exists to catch: seven daily columns total one
+  # week, so limits describing a single day are seven times too small.
+  expect_error(
+    islh_surveillance_snapshot(
+      daily, period_start, count,
+      by = site, periods = 7, baseline = daily_baseline
+    ),
+    "different reporting period"
+  )
+})
+
+test_that("a weekly baseline fits a seven-day snapshot", {
+  events <- surv_daily()
+  daily <- islh_count_events(
+    events, date = date, by = site, count = count, interval = "day"
+  )
+  weekly <- islh_count_events(
+    events, date = date, by = site, count = count, interval = "week"
+  )
+  weekly_baseline <- islh_surveillance_baseline(
+    weekly, period_start, count, by = site
+  )
+
+  out <- islh_surveillance_snapshot(
+    daily, period_start, count,
+    by = site, periods = 7, baseline = weekly_baseline
+  )
+
+  expect_true("exceeds_reference" %in% names(out))
+  expect_equal(attr(out, "islh_interval"), "day")
+  expect_equal(attr(out, "islh_periods"), 7L)
+})
+
+test_that("weekly counts cannot be shown as a daily snapshot", {
+  weekly <- islh_count_events(
+    surv_daily(),
+    date = date,
+    by = site,
+    count = count,
+    interval = "week"
+  )
+
+  expect_error(
+    islh_surveillance_snapshot(
+      weekly, period_start, count, by = site, interval = "day", periods = 7
+    ),
+    "cannot be summarised"
+  )
+})
+
+test_that("a baseline of unknown duration is refused, and can be declared", {
+  daily <- islh_count_events(
+    surv_daily(),
+    date = date,
+    by = site,
+    count = count,
+    interval = "day"
+  )
+  hand_built <- data.frame(site = c("A", "B"), upper_limit = c(10, 12))
+
+  expect_error(
+    islh_surveillance_snapshot(
+      daily, period_start, count, by = site, periods = 7, baseline = hand_built
+    ),
+    "does not record the duration"
+  )
+
+  out <- islh_surveillance_snapshot(
+    daily, period_start, count,
+    by = site, periods = 7,
+    baseline = hand_built, baseline_interval = "week"
+  )
+  expect_true("exceeds_reference" %in% names(out))
+
+  expect_error(
+    islh_surveillance_snapshot(
+      daily, period_start, count,
+      by = site, periods = 7,
+      baseline = hand_built, baseline_interval = "day"
+    ),
+    "different reporting period"
+  )
+})
+
+test_that("a declared baseline interval cannot contradict a recorded one", {
+  events <- surv_daily()
+  daily <- islh_count_events(
+    events, date = date, by = site, count = count, interval = "day"
+  )
+  weekly <- islh_count_events(
+    events, date = date, by = site, count = count, interval = "week"
+  )
+  baseline <- islh_surveillance_baseline(weekly, period_start, count, by = site)
+
+  expect_error(
+    islh_surveillance_snapshot(
+      daily, period_start, count,
+      by = site, periods = 7,
+      baseline = baseline, baseline_interval = "day"
+    ),
+    "contradicts"
+  )
+})
+
+# Alert boundary -------------------------------------------------------------
+
+test_that("a total exactly equal to the upper limit is flagged", {
+  # The documented policy is at-or-above, not strictly above. This matters for
+  # method = "range", where the limit is a whole historical maximum that a
+  # current total lands on regularly.
+  daily <- data.frame(
+    site = c("A", "B", "C"),
+    date = as.Date("2026-08-01"),
+    count = c(9, 10, 11)
+  )
+  baseline <- data.frame(
+    site = c("A", "B", "C"),
+    upper_limit = c(10, 10, 10)
+  )
+
+  out <- islh_surveillance_snapshot(
+    daily, date, count,
+    by = site, periods = 1,
+    baseline = baseline, baseline_interval = "day"
+  )
+
+  expect_equal(out$total, c(9, 10, 11))
+  expect_equal(out$exceeds_reference, c(FALSE, TRUE, TRUE))
+})
+
+test_that("a group with no upper limit gets a missing flag, not FALSE", {
+  daily <- data.frame(
+    site = c("A", "B"),
+    date = as.Date("2026-08-01"),
+    count = c(4, 4)
+  )
+  baseline <- data.frame(site = c("A", "B"), upper_limit = c(2, NA))
+
+  out <- islh_surveillance_snapshot(
+    daily, date, count,
+    by = site, periods = 1,
+    baseline = baseline, baseline_interval = "day"
+  )
+  expect_equal(out$exceeds_reference, c(TRUE, NA))
 })

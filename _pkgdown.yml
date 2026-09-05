@@ -65,4 +65,5 @@ reference:
     contents:
       - islh_suppress
       - islh_suppress_table
+      - islh_suppression_audit
       - islh_round_base

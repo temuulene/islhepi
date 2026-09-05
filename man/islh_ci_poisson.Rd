@@ -4,24 +4,29 @@
 \alias{islh_ci_poisson}
 \title{Confidence interval for a Poisson count}
 \usage{
-islh_ci_poisson(x, conf = 0.95, method = c("byar", "exact"))
+islh_ci_poisson(x, conf = 0.95, method = c("auto", "byar", "exact"))
 }
 \arguments{
 \item{x}{Observed counts.}
 
 \item{conf}{Confidence level.}
 
-\item{method}{\code{"byar"} or \code{"exact"}.}
+\item{method}{\code{"auto"}, \code{"byar"} or \code{"exact"}.}
 }
 \value{
-A data frame with columns \code{x}, \code{lower} and \code{upper}.
+A data frame with columns \code{x}, \code{lower}, \code{upper} and \code{method}, where
+\code{method} records the method actually used for that count.
 }
 \description{
+\code{"auto"} is the default. It uses the exact interval for counts below 10
+and Byar's approximation at or above 10, which is the choice most
+analysts would make by hand.
+}
+\details{
 \code{"byar"} uses Byar's approximation, the method Statistics Canada and most
 cancer registries use for rate intervals. It is accurate for counts of
 roughly 10 or more and much cheaper than the exact method.
-}
-\details{
+
 \code{"exact"} inverts the Poisson distribution through the chi-squared
 relationship (the Garwood interval). Use it for small counts, where Byar's
 approximation drifts.
@@ -29,15 +34,24 @@ approximation drifts.
 Byar's approximation is undefined at zero, so a count of zero uses the exact
 interval whichever method you ask for.
 }
+\section{Choosing a method by hand}{
+
+
+Pick \code{"byar"} or \code{"exact"} explicitly when a release has to match a
+published series that used one method throughout. \code{"auto"} mixes the two
+within a single column, which is the right statistical choice but makes the
+method a property of each row rather than of the table. Say which method you
+used in the table notes either way.
+}
+
 \examples{
 islh_ci_poisson(c(0, 3, 25, 100))
 
 # Small counts are where the two methods disagree.
 islh_ci_poisson(3, method = "exact")
+islh_ci_poisson(3, method = "byar")
 }
 \references{
 Breslow NE, Day NE (1987). \emph{Statistical Methods in Cancer Research,
 Volume II}. IARC Scientific Publications No. 82, section 2.3.
 }
-
-

@@ -26,8 +26,33 @@
 #' disclosure policy question rather than a statistical one. Check the rule your
 #' release is governed by before publishing.
 #'
+#' @section Groups:
+#'
+#' `by` names the columns that identify each block of rows summing to its own
+#' published total, and the complementary rule then runs once per block rather
+#' than once per column. This matters whenever a table is subtotalled. A table
+#' broken down by health authority has one total per authority, so a reader
+#' subtracts within an authority; a single cell hidden in one authority is
+#' recoverable even though the column as a whole has several cells hidden.
+#'
+#' With no `by`, the whole column is treated as one block, which is right for a
+#' table with a single overall total.
+#'
+#' @section Auditing what was hidden:
+#'
+#' The result carries a record of every cell that was suppressed and why. Read
+#' it with [islh_suppression_audit()] and keep it with your working notes: it
+#' is what lets a reviewer confirm that the complementary rule fired where it
+#' should have, without re-running the analysis.
+#'
+#' The record deliberately holds no counts. It says which cell was hidden, not
+#' what was in it, so attaching it to a released table cannot leak the values
+#' the suppression was there to protect.
+#'
 #' @param data A data frame.
-#' @param cols Columns to suppress. Character names or numeric positions.
+#' @param cols Columns to suppress, as character names or whole numeric
+#'   positions. Factors, logicals, repeated entries and positions outside
+#'   `data` are rejected rather than resolved to a column you did not ask for.
 #' @param threshold Approved disclosure-control threshold. It must be supplied
 #'   explicitly because the appropriate rule depends on the data and context.
 #' @param inclusive Suppress positive counts less than or equal to the
@@ -35,15 +60,19 @@
 #' @param label Display label for cells hidden because they are small. With
 #'   `NULL`, they become missing numeric values. See the label section of
 #'   [islh_suppress()].
-#' @param complementary Also suppress the smallest surviving value in any
-#'   column where exactly one cell was suppressed. Must be one non-missing
-#'   `TRUE` or `FALSE`.
+#' @param complementary Also suppress the smallest surviving value wherever
+#'   exactly one cell was suppressed. Must be one non-missing `TRUE` or
+#'   `FALSE`.
 #' @param complementary_label Display label for cells hidden to protect another
 #'   cell. Must not imply a value, since such a cell can be any size. Only used
 #'   when `label` is set; with no `label` every suppressed cell becomes a
 #'   missing value and the column stays numeric.
+#' @param by Optional column names identifying the groups the complementary
+#'   rule applies within. See the groups section. Ignored when
+#'   `complementary = FALSE`.
 #'
-#' @return The data frame, with the named columns suppressed.
+#' @return The data frame, with the named columns suppressed, carrying an audit
+#'   record readable with [islh_suppression_audit()].
 #' @export
 #'
 #' @examples
@@ -62,6 +91,20 @@
 #'   counts, "cases", threshold = 5,
 #'   complementary = TRUE, label = "Suppressed"
 #' )
+#'
+#' # A subtotalled table is protected within each subtotal, not across the
+#' # whole column.
+#' by_authority <- data.frame(
+#'   authority = c("Island", "Island", "Interior", "Interior"),
+#'   area = c("North", "South", "East", "West"),
+#'   cases = c(2, 30, 4, 25)
+#' )
+#'
+#' hidden <- islh_suppress_table(
+#'   by_authority, "cases", threshold = 5,
+#'   complementary = TRUE, by = "authority", label = "Suppressed"
+#' )
+#' islh_suppression_audit(hidden)
 islh_suppress_table <- function(
   data,
   cols,
@@ -69,7 +112,8 @@ islh_suppress_table <- function(
   inclusive = TRUE,
   label = NULL,
   complementary = FALSE,
-  complementary_label = "Suppressed"
+  complementary_label = "Suppressed",
+  by = NULL
 ) {
   if (!is.data.frame(data)) {
     .islh_abort("{.arg data} must be a data frame.")
@@ -90,32 +134,43 @@ islh_suppress_table <- function(
     )
   }
 
-  if (is.character(cols)) {
-    unknown <- setdiff(cols, names(data))
-    if (length(unknown) > 0L) {
-      .islh_abort("{.arg data} has no column{?s} named {.field {unknown}}.")
-    }
-  } else if (is.numeric(cols)) {
-    if (any(cols < 1L | cols > ncol(data))) {
-      .islh_abort("{.arg cols} must be column positions within {.arg data}.")
-    }
+  cols <- .islh_check_cols(cols, data)
+  by <- .islh_check_by(by, data, cols)
+
+  # One label per row naming the block it belongs to. With no `by` every row is
+  # in the same block, which is the whole-column rule.
+  groups <- if (length(by) == 0L) {
+    rep("", nrow(data))
+  } else {
+    do.call(paste, c(unname(as.list(data[by])), list(sep = " | ")))
   }
+
+  audit <- vector("list", length(cols))
+  names(audit) <- cols
 
   for (col in cols) {
     counts <- .islh_check_counts(data[[col]], arg = paste0("data$", col))
     small <- .islh_small(counts, threshold, inclusive)
-
     extra <- rep(FALSE, length(counts))
-    if (isTRUE(complementary) && sum(small) == 1L) {
-      # Exactly one hidden cell is the recoverable case: a reader subtracts the
-      # visible cells from the total and gets it back. Hide the smallest
-      # survivor too. Two or more already break that arithmetic.
-      survivors <- counts
-      survivors[small | is.na(counts)] <- NA
-      if (any(!is.na(survivors))) {
-        extra[which.min(survivors)] <- TRUE
+
+    if (isTRUE(complementary)) {
+      for (group in unique(groups)) {
+        rows <- which(groups == group)
+        # Exactly one hidden cell is the recoverable case: a reader subtracts
+        # the visible cells from the total and gets it back. Hide the smallest
+        # survivor too. Two or more already break that arithmetic.
+        if (sum(small[rows]) != 1L) {
+          next
+        }
+        survivors <- counts[rows]
+        survivors[small[rows] | is.na(survivors)] <- NA
+        if (any(!is.na(survivors))) {
+          extra[rows[which.min(survivors)]] <- TRUE
+        }
       }
     }
+
+    audit[[col]] <- .islh_suppression_record(col, groups, small, extra, by)
 
     # `label` alone decides the output type, as it does in islh_suppress().
     # With no label, every suppressed cell — small or complementary — becomes
@@ -137,7 +192,86 @@ islh_suppress_table <- function(
     data[[col]] <- output
   }
 
+  attr(data, "islh_suppression") <- .islh_bind_audit(audit)
   data
+}
+
+# One row per hidden cell. Deliberately records no counts: see the auditing
+# section of islh_suppress_table().
+.islh_suppression_record <- function(column, groups, small, extra, by) {
+  rows <- which(small | extra)
+  data.frame(
+    column = rep(column, length(rows)),
+    row = rows,
+    group = if (length(by) == 0L) {
+      rep(NA_character_, length(rows))
+    } else {
+      as.character(groups[rows])
+    },
+    reason = ifelse(small[rows], "small", "complementary"),
+    stringsAsFactors = FALSE
+  )
+}
+
+.islh_bind_audit <- function(audit) {
+  empty <- data.frame(
+    column = character(),
+    row = integer(),
+    group = character(),
+    reason = character(),
+    stringsAsFactors = FALSE
+  )
+  audit <- audit[!vapply(audit, is.null, logical(1))]
+  if (length(audit) == 0L) {
+    return(empty)
+  }
+  out <- do.call(rbind, c(list(empty), unname(audit)))
+  rownames(out) <- NULL
+  out
+}
+
+#' Read the record of what a suppression hid
+#'
+#' Returns one row for every cell [islh_suppress_table()] hid, saying which
+#' cell it was and why it was hidden. Keep it with your working notes so a
+#' reviewer can confirm the rule behaved as intended.
+#'
+#' The record holds no counts. It says a cell was hidden, not what was in it,
+#' so it is safe to keep alongside a released table.
+#'
+#' @param data A data frame returned by [islh_suppress_table()].
+#'
+#' @return A data frame with columns `column`, `row`, `group` and `reason`.
+#'   `reason` is `"small"` for a cell the threshold caught and
+#'   `"complementary"` for one hidden to protect another. `group` is the block
+#'   the complementary rule ran within, or `NA` when no `by` was used. A table
+#'   with nothing hidden gives a zero-row data frame.
+#' @export
+#'
+#' @examples
+#' counts <- data.frame(
+#'   area = c("North", "Central", "South"),
+#'   cases = c(3, 42, 17)
+#' )
+#'
+#' hidden <- islh_suppress_table(
+#'   counts, "cases", threshold = 5,
+#'   complementary = TRUE, label = "Suppressed"
+#' )
+#' islh_suppression_audit(hidden)
+islh_suppression_audit <- function(data) {
+  if (!is.data.frame(data)) {
+    .islh_abort("{.arg data} must be a data frame.")
+  }
+  record <- attr(data, "islh_suppression", exact = TRUE)
+  if (is.null(record)) {
+    .islh_abort(c(
+      "{.arg data} carries no suppression record.",
+      i = "Records are attached by {.fn islh_suppress_table}. Subsetting a
+           data frame drops them, so read the record before reshaping."
+    ))
+  }
+  record
 }
 
 #' Round counts to a fixed base

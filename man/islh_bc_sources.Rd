@@ -12,8 +12,8 @@ resource ID and catalogue URL.
 }
 \description{
 Returns the permanent BC Data Catalogue record and resource identifiers used
-by \code{islh_bc_population()} and \code{islh_bc_geography()}. Use this table
-to audit or cite the source of a downloaded extract.
+by \code{\link[=islh_bc_population]{islh_bc_population()}} and \code{\link[=islh_bc_geography]{islh_bc_geography()}}. Use this table to audit
+or cite the source of a downloaded extract.
 }
 \examples{
 islh_bc_sources()

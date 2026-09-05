@@ -204,3 +204,140 @@ test_that("the Fay-Feuer interval matches a published worked example", {
 })
 
 
+
+# Fay and Feuer (1997) reference example ------------------------------------
+#
+# Michigan birth data, 1950-1964, from Stark and Mantel via Fleiss and
+# reproduced as Table II of the paper: mongoloid births by maternal age for
+# mothers whose child was fifth-born or later. The standard population is the
+# maternal-age distribution of all births, the second half of the same table.
+#
+# This is the paper's own worst case. The weights for the two youngest maternal
+# age groups are enormous relative to the rest, because very few mothers have a
+# fifth child before they are 25, and one stratum contributes no events at all.
+# That is precisely where a multistratum implementation goes wrong quietly, and
+# where the gamma interval departs from the normal approximation: Table I gives
+# a published upper limit of 188.3 against a rate of 75.5.
+
+michigan_cases <- c(0, 8, 63, 112, 262, 295)
+michigan_births <- c(327, 30666, 123419, 149919, 104088, 34392)
+michigan_standard <- c(319933, 931318, 786511, 488235, 237863, 61313)
+
+test_that("dsr reproduces the published Fay-Feuer multistratum example", {
+  out <- islh_dsr(
+    michigan_cases,
+    michigan_births,
+    michigan_standard,
+    per = 100000,
+    conf = 0.95,
+    method = "gamma"
+  )
+
+  # Fay and Feuer (1997), Table I, birth order 5+: rate 75.5, gamma interval
+  # (67.7, 188.3), printed to one decimal place.
+  expect_equal(round(out$rate, 1), 75.5)
+  expect_equal(round(out$lower, 1), 67.7)
+  expect_equal(round(out$upper, 1), 188.3)
+
+  expect_equal(out$cases, sum(michigan_cases))
+  expect_equal(out$population, sum(michigan_births))
+})
+
+test_that("the published example separates gamma from the normal approximation", {
+  gamma <- islh_dsr(michigan_cases, michigan_births, michigan_standard)
+  normal <- islh_dsr(
+    michigan_cases,
+    michigan_births,
+    michigan_standard,
+    method = "normal"
+  )
+
+  # The paper's point in choosing this example: with weights this uneven the
+  # normal interval is far too narrow at the top. A gamma upper limit that had
+  # collapsed onto the normal one would mean the w_max term was not applied.
+  expect_gt(gamma$upper, normal$upper + 50)
+  expect_equal(round(gamma$rate, 6), round(normal$rate, 6))
+})
+
+test_that("gamma limits are exact when the standard matches the study population", {
+  # Fay and Feuer show that where the DSR reduces to a scaled Poisson variate
+  # the gamma interval gives the exact solution. Weights proportional to the
+  # study population are that case, so a five-stratum standardised rate must
+  # land exactly on the Garwood interval for the pooled count. The expected
+  # values come from the exact Poisson interval, not from re-running the DSR.
+  cases <- c(3, 11, 27, 40, 6)
+  population <- c(12000, 18500, 22000, 9000, 4500)
+  standard <- population * 7.25
+
+  out <- islh_dsr(cases, population, standard, per = 100000, conf = 0.95)
+  exact <- islh_crude_rate(
+    sum(cases),
+    sum(population),
+    per = 100000,
+    conf = 0.95,
+    method = "exact"
+  )
+
+  expect_equal(out$rate, exact$rate)
+  expect_equal(out$lower, exact$lower)
+  expect_equal(out$upper, exact$upper)
+})
+
+# Poisson interval method selection -----------------------------------------
+
+test_that("auto uses exact below 10 and Byar at 10 and above", {
+  out <- islh_ci_poisson(c(0, 1, 9, 10, 25), method = "auto")
+  expect_equal(out$method, c("exact", "exact", "exact", "byar", "byar"))
+
+  exact <- islh_ci_poisson(c(0, 1, 9), method = "exact")
+  byar <- islh_ci_poisson(c(10, 25), method = "byar")
+  expect_equal(out$lower, c(exact$lower, byar$lower))
+  expect_equal(out$upper, c(exact$upper, byar$upper))
+})
+
+test_that("auto is the default and zero always takes the exact interval", {
+  expect_equal(islh_ci_poisson(4), islh_ci_poisson(4, method = "auto"))
+
+  # Byar's approximation is undefined at zero whichever method was asked for.
+  expect_equal(islh_ci_poisson(0, method = "byar")$method, "exact")
+  expect_equal(
+    islh_ci_poisson(0, method = "byar")$upper,
+    islh_ci_poisson(0, method = "exact")$upper
+  )
+})
+
+test_that("crude rate reports the method used for each row", {
+  out <- islh_crude_rate(c(2, 40), c(1000, 50000))
+  expect_equal(out$method, c("exact", "byar"))
+
+  fixed <- islh_crude_rate(c(2, 40), c(1000, 50000), method = "byar")
+  expect_equal(fixed$method, c("byar", "byar"))
+  expect_false(isTRUE(all.equal(out$lower[1], fixed$lower[1])))
+})
+
+# Zero denominators ----------------------------------------------------------
+
+test_that("a zero denominator is refused and says which stratum", {
+  expect_error(
+    islh_crude_rate(c(1, 0), c(1000, 0)),
+    "must be positive"
+  )
+  expect_error(
+    islh_crude_rate(c(1, 0), c(1000, 0)),
+    "Position"
+  )
+  expect_error(
+    islh_dsr(c(1, 2), c(1000, 0), c(500, 500)),
+    "must be positive"
+  )
+})
+
+test_that("a zero standard population weights a stratum out rather than failing", {
+  cases <- c(5, 12, 40)
+  population <- c(20000, 25000, 22000)
+
+  with_zero <- islh_dsr(cases, population, c(30000, 30000, 0))
+  without <- islh_dsr(cases[1:2], population[1:2], c(30000, 30000))
+
+  expect_equal(with_zero$rate, without$rate)
+})

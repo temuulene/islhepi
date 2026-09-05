@@ -20,9 +20,9 @@ the resource.}
 
 \item{sex}{Either one or both of \code{"F"} and \code{"M"}, or \code{"T"} alone.}
 
-\item{age_breaks}{Age bands passed to \code{islh_age_group()}.}
+\item{age_breaks}{Age bands passed to \code{\link[=islh_age_group]{islh_age_group()}}.}
 
-\item{age_labels}{Optional labels passed to \code{islh_age_group()}.}
+\item{age_labels}{Optional labels passed to \code{\link[=islh_age_group]{islh_age_group()}}.}
 }
 \value{
 A tibble with \code{geography}, \code{geography_code}, \code{geography_name},
@@ -30,18 +30,32 @@ A tibble with \code{geography}, \code{geography_code}, \code{geography_name},
 }
 \description{
 Downloads a pinned BC Stats sub-provincial population resource through
-\code{bcdata} and returns one row per geography, year, estimate type, sex and
-age group. The output is ready to join to \code{islh_bc_geography()} using
+\code{bcdata} and returns one row per geography, year, estimate type, sex and age
+group. The output is ready to join to \code{\link[=islh_bc_geography]{islh_bc_geography()}} using
 \code{geography} and \code{geography_code}.
 }
 \details{
-\code{sex = c("F", "M")} is the default because those rows can be summed
-without double counting. Total rows (\code{"T"}) must be requested on their own.
+\code{sex = c("F", "M")} is the default because those rows can be summed without
+double counting. Total rows (\code{"T"}) must be requested on their own.
 
 Population resources cover all of BC. When mapping one health authority,
 join the population rows to the filtered object returned by
-\code{islh_bc_geography()} and allow unmatched population rows to be discarded.
+\code{\link[=islh_bc_geography]{islh_bc_geography()}} and allow unmatched population rows to be discarded.
 }
+\section{Zero populations}{
+
+
+A zero cell is kept. In a small local health area an age band can genuinely
+have nobody in it, and that is a real measurement rather than a gap in the
+data. Dropping those rows would silently turn a complete denominator table
+into an incomplete one, so a later join would produce missing populations
+that look like a download problem.
+
+A zero denominator has no rate, so the rate functions refuse it rather than
+return an infinite one. See the zero-denominator section of
+\code{\link[=islh_crude_rate]{islh_crude_rate()}} for what to do with these rows.
+}
+
 \examples{
 \dontrun{
 lha_population <- islh_bc_population("lha", years = 2021:2026)

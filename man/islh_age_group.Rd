@@ -29,5 +29,3 @@ islh_age_group(c(2, 17, 42, 91), breaks = "broad")
 # A local standard needs no change to the package.
 islh_age_group(c(2, 17, 42, 91), breaks = c(0, 18, 65))
 }
-
-

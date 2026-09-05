@@ -9,13 +9,14 @@ islh_crude_rate(
   population,
   per = 1e+05,
   conf = 0.95,
-  method = c("byar", "exact")
+  method = c("auto", "byar", "exact")
 )
 }
 \arguments{
 \item{cases}{Non-negative whole event counts.}
 
-\item{population}{Population or person-time at risk. Recycled if length 1.}
+\item{population}{Population or person-time at risk. Recycled if length 1.
+Must be positive; see the zero-denominator section.}
 
 \item{per}{Rate denominator. 100,000 by convention in public health.}
 
@@ -24,8 +25,8 @@ islh_crude_rate(
 \item{method}{Interval method passed to \code{\link[=islh_ci_poisson]{islh_ci_poisson()}}.}
 }
 \value{
-A data frame with columns \code{cases}, \code{population}, \code{rate}, \code{lower}
-and \code{upper}.
+A data frame with columns \code{cases}, \code{population}, \code{rate}, \code{lower},
+\code{upper} and \code{method}.
 }
 \description{
 Divides event counts by a population or person-time denominator and scales
@@ -33,8 +34,22 @@ to \code{per}. The interval comes from \code{\link[=islh_ci_poisson]{islh_ci_poi
 scaled the same way. Counts may exceed the denominator when people can
 experience more than one event.
 }
+\section{Zero denominators}{
+
+
+A zero denominator is refused rather than divided by. Nobody is at risk in
+such a stratum, so it has no rate at all, and dividing by it would put \code{Inf}
+or \code{NaN} into a published table.
+
+Zero denominators are real values and reach you legitimately: a small local
+health area can have an age band with nobody in it, and
+\code{\link[=islh_bc_population]{islh_bc_population()}} keeps those rows rather than dropping them. Decide
+what they mean before calculating. Usually you either drop those strata,
+which reports no rate where no rate exists, or combine them with a
+neighbouring age band or area, which reports a rate over a denominator large
+enough to carry one. Say which you did in the table notes.
+}
+
 \examples{
 islh_crude_rate(cases = c(12, 45), population = c(50000, 120000))
 }
-
-

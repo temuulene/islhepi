@@ -66,8 +66,11 @@
   x
 }
 
-# Populations must be positive and finite. Zero is rejected: a stratum with
-# nobody in it has no rate, and dividing by it silently yields Inf.
+# Populations must be positive and finite. Zero is rejected by default: a
+# stratum with nobody in it has no rate, and dividing by it silently yields Inf.
+#
+# A zero denominator is a real value, not a missing one, so the error names the
+# affected strata and says what to do with them rather than just refusing.
 .islh_check_population <- function(x, arg = "population", allow_zero = FALSE) {
   if (!is.numeric(x)) {
     .islh_abort("{.arg {arg}} must be numeric, not {.cls {class(x)[1]}}.")
@@ -78,12 +81,23 @@
   if (any(is.infinite(x))) {
     .islh_abort("{.arg {arg}} must be finite.")
   }
-  limit <- if (isTRUE(allow_zero)) 0 else .Machine$double.eps
-  if (any(x < limit)) {
-    .islh_abort(
-      "{.arg {arg}} must be {if (isTRUE(allow_zero)) 'non-negative' else 'positive'}."
-    )
+  if (any(x < 0)) {
+    .islh_abort("{.arg {arg}} must not be negative.")
   }
+
+  if (!isTRUE(allow_zero)) {
+    zero <- which(x == 0)
+    if (length(zero) > 0L) {
+      .islh_abort(c(
+        "{.arg {arg}} must be positive.",
+        x = "{cli::qty(length(zero))}Position{?s} {.val {zero}} {?is/are} zero.",
+        i = "Nobody is at risk there, so the stratum has no rate. Drop those
+             strata, or combine them with a neighbouring one, before
+             calculating."
+      ))
+    }
+  }
+
   x
 }
 
@@ -203,3 +217,134 @@
 }
 
 
+
+
+# Which columns did the caller mean?
+#
+# Every rejection here is a case that otherwise selects the wrong column
+# silently. `data[[1.5]]` truncates to column 1. `data[[TRUE]]` is also column
+# 1. A factor indexes by its level code, not its label, so
+# `factor("cases")` picks column 1 of a table whose first column is something
+# else entirely. Each of those publishes an unsuppressed column while
+# reporting success.
+.islh_check_cols <- function(cols, data, arg = "cols") {
+  if (missing(cols) || is.null(cols)) {
+    .islh_abort(c(
+      "{.arg {arg}} must name the columns to suppress.",
+      i = "There is no default: suppressing every column, or none, is a
+           decision the caller has to make."
+    ))
+  }
+
+  if (is.factor(cols)) {
+    .islh_abort(c(
+      "{.arg {arg}} is a factor.",
+      x = "A factor indexes by its level codes, not by the names it shows.",
+      i = "Convert it first, for example {.code as.character({arg})}."
+    ))
+  }
+  if (is.logical(cols)) {
+    .islh_abort(c(
+      "{.arg {arg}} is logical.",
+      x = "{.code TRUE} selects the first column rather than every column.",
+      i = "Give column names, or positions such as {.code c(2, 3)}."
+    ))
+  }
+  if (!is.character(cols) && !is.numeric(cols)) {
+    .islh_abort(
+      "{.arg {arg}} must be column names or positions, not {.cls {class(cols)[1]}}."
+    )
+  }
+  if (length(cols) == 0L) {
+    .islh_abort(c(
+      "{.arg {arg}} is empty, so nothing would be suppressed.",
+      i = "Name at least one column, or do not call this function."
+    ))
+  }
+  if (anyNA(cols)) {
+    .islh_abort("{.arg {arg}} must not contain missing values.")
+  }
+
+  if (is.character(cols)) {
+    if (any(!nzchar(trimws(cols)))) {
+      .islh_abort("{.arg {arg}} must not contain empty column names.")
+    }
+    unknown <- setdiff(cols, names(data))
+    if (length(unknown) > 0L) {
+      .islh_abort("{.arg data} has no column{?s} named {.field {unknown}}.")
+    }
+    selected <- cols
+  } else {
+    if (any(!is.finite(cols))) {
+      .islh_abort("{.arg {arg}} must be finite column positions.")
+    }
+    fractional <- abs(cols - round(cols)) > .Machine$double.eps^0.5
+    if (any(fractional)) {
+      .islh_abort(c(
+        "{.arg {arg}} must be whole column positions.",
+        x = "{cli::qty(sum(fractional))}Position{?s} {.val {cols[fractional]}}
+             {?is/are} fractional.",
+        i = "A fractional position is truncated, so it selects a column you
+             did not ask for."
+      ))
+    }
+    cols <- as.integer(round(cols))
+    outside <- cols < 1L | cols > ncol(data)
+    if (any(outside)) {
+      .islh_abort(c(
+        "{.arg {arg}} must be column positions within {.arg data}.",
+        x = "{.arg data} has {ncol(data)} column{?s}; got
+             {.val {cols[outside]}}."
+      ))
+    }
+    selected <- names(data)[cols]
+  }
+
+  duplicated_cols <- unique(selected[duplicated(selected)])
+  if (length(duplicated_cols) > 0L) {
+    .islh_abort(c(
+      "{.arg {arg}} names the same column more than once.",
+      x = "Repeated: {.field {duplicated_cols}}.",
+      i = "Suppressing a column twice hides a second cell that the rule never
+           selected."
+    ))
+  }
+
+  selected
+}
+
+# Grouping columns for complementary suppression. These identify the row sets
+# that each sum to a published total, so they must exist, be distinct, and not
+# be the count columns being suppressed.
+.islh_check_by <- function(by, data, cols, arg = "by") {
+  if (is.null(by)) {
+    return(character())
+  }
+  if (!is.character(by)) {
+    .islh_abort(
+      "{.arg {arg}} must be NULL or column names, not {.cls {class(by)[1]}}."
+    )
+  }
+  if (length(by) == 0L) {
+    return(character())
+  }
+  if (anyNA(by) || any(!nzchar(trimws(by)))) {
+    .islh_abort("{.arg {arg}} must not contain missing or empty column names.")
+  }
+  unknown <- setdiff(by, names(data))
+  if (length(unknown) > 0L) {
+    .islh_abort("{.arg data} has no column{?s} named {.field {unknown}}.")
+  }
+  repeated <- unique(by[duplicated(by)])
+  if (length(repeated) > 0L) {
+    .islh_abort("{.arg {arg}} names {.field {repeated}} more than once.")
+  }
+  overlap <- intersect(by, cols)
+  if (length(overlap) > 0L) {
+    .islh_abort(c(
+      "{.arg {arg}} and {.arg cols} share {.field {overlap}}.",
+      i = "A column cannot both define the groups and be suppressed."
+    ))
+  }
+  by
+}

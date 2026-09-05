@@ -11,13 +11,16 @@ islh_suppress_table(
   inclusive = TRUE,
   label = NULL,
   complementary = FALSE,
-  complementary_label = "Suppressed"
+  complementary_label = "Suppressed",
+  by = NULL
 )
 }
 \arguments{
 \item{data}{A data frame.}
 
-\item{cols}{Columns to suppress. Character names or numeric positions.}
+\item{cols}{Columns to suppress, as character names or whole numeric
+positions. Factors, logicals, repeated entries and positions outside
+\code{data} are rejected rather than resolved to a column you did not ask for.}
 
 \item{threshold}{Approved disclosure-control threshold. It must be supplied
 explicitly because the appropriate rule depends on the data and context.}
@@ -29,17 +32,22 @@ threshold. Must be one non-missing \code{TRUE} or \code{FALSE}.}
 \code{NULL}, they become missing numeric values. See the label section of
 \code{\link[=islh_suppress]{islh_suppress()}}.}
 
-\item{complementary}{Also suppress the smallest surviving value in any
-column where exactly one cell was suppressed. Must be one non-missing
-\code{TRUE} or \code{FALSE}.}
+\item{complementary}{Also suppress the smallest surviving value wherever
+exactly one cell was suppressed. Must be one non-missing \code{TRUE} or
+\code{FALSE}.}
 
 \item{complementary_label}{Display label for cells hidden to protect another
 cell. Must not imply a value, since such a cell can be any size. Only used
 when \code{label} is set; with no \code{label} every suppressed cell becomes a
 missing value and the column stays numeric.}
+
+\item{by}{Optional column names identifying the groups the complementary
+rule applies within. See the groups section. Ignored when
+\code{complementary = FALSE}.}
 }
 \value{
-The data frame, with the named columns suppressed.
+The data frame, with the named columns suppressed, carrying an audit
+record readable with \code{\link[=islh_suppression_audit]{islh_suppression_audit()}}.
 }
 \description{
 Applies \code{\link[=islh_suppress]{islh_suppress()}} to several columns at once.
@@ -64,6 +72,33 @@ disclosure policy question rather than a statistical one. Check the rule your
 release is governed by before publishing.
 }
 
+\section{Groups}{
+
+
+\code{by} names the columns that identify each block of rows summing to its own
+published total, and the complementary rule then runs once per block rather
+than once per column. This matters whenever a table is subtotalled. A table
+broken down by health authority has one total per authority, so a reader
+subtracts within an authority; a single cell hidden in one authority is
+recoverable even though the column as a whole has several cells hidden.
+
+With no \code{by}, the whole column is treated as one block, which is right for a
+table with a single overall total.
+}
+
+\section{Auditing what was hidden}{
+
+
+The result carries a record of every cell that was suppressed and why. Read
+it with \code{\link[=islh_suppression_audit]{islh_suppression_audit()}} and keep it with your working notes: it
+is what lets a reviewer confirm that the complementary rule fired where it
+should have, without re-running the analysis.
+
+The record deliberately holds no counts. It says which cell was hidden, not
+what was in it, so attaching it to a released table cannot leak the values
+the suppression was there to protect.
+}
+
 \examples{
 counts <- data.frame(
   area = c("North", "Central", "South"),
@@ -80,6 +115,18 @@ islh_suppress_table(
   counts, "cases", threshold = 5,
   complementary = TRUE, label = "Suppressed"
 )
+
+# A subtotalled table is protected within each subtotal, not across the
+# whole column.
+by_authority <- data.frame(
+  authority = c("Island", "Island", "Interior", "Interior"),
+  area = c("North", "South", "East", "West"),
+  cases = c(2, 30, 4, 25)
+)
+
+hidden <- islh_suppress_table(
+  by_authority, "cases", threshold = 5,
+  complementary = TRUE, by = "authority", label = "Suppressed"
+)
+islh_suppression_audit(hidden)
 }
-
-

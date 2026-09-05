@@ -36,5 +36,3 @@ islh_round_base(c(0, 2, 3, 7, 12, 43), base = 5)
 set.seed(42)
 islh_round_base(c(2, 3, 7, 12), base = 5, method = "random")
 }
-
-

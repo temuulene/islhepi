@@ -50,5 +50,3 @@ islh_suppress(c(0, 3, 42), threshold = 5, label = "Suppressed")
 # "<5" is only accurate with the exclusive rule.
 islh_suppress(c(4, 5, 6), threshold = 5, inclusive = FALSE, label = "<5")
 }
-
-

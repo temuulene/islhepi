@@ -68,10 +68,10 @@ and confidence limits, making the calculation easy to audit.
 crude <- islh_crude_rate(
   cases = c(12, 45),
   population = c(50000, 120000),
-  per = 100000,
-  method = "exact"
+  per = 100000
 )
-round(crude, 1)
+crude$method
+round(crude[c("cases", "population", "rate", "lower", "upper")], 1)
 ```
 
 Read the first row as: 12 events in a population of 50,000, expressed per
@@ -79,15 +79,22 @@ Read the first row as: 12 events in a population of 50,000, expressed per
 denominator when the numerator contains repeat events and the denominator is
 person-time.
 
+`method` records which interval each row actually used. The default,
+`method = "auto"`, takes the exact interval for counts below 10 and Byar's
+approximation from 10 upwards. Set `method` explicitly when a release has to
+match a published series that used one method throughout.
+
 ## Poisson count intervals
 
 ```{r poisson-intervals}
-round(islh_ci_poisson(c(0, 3, 25), method = "exact"), 2)
+islh_ci_poisson(c(0, 3, 25))
 ```
 
-Use `method = "exact"` for small counts when required by the analytical
-standard. `"byar"` is an approximation and falls back to the exact upper
-limit when the count is zero.
+The default picks a method per count: exact below 10, Byar at 10 and above.
+Set `method = "exact"` or `method = "byar"` to use one method throughout, as
+an analytical standard may require. `"byar"` is an approximation and falls
+back to the exact interval when the count is zero, because Byar's is undefined
+there.
 
 ## Directly standardised rates
 
@@ -155,6 +162,41 @@ islh_suppress_table(
   label = "Suppressed",
   complementary = TRUE
 )
+```
+
+By default the complementary rule looks at the whole column, which is right
+for a table carrying one overall total. Where a table is subtotalled, name the
+subtotal columns with `by` so the rule runs inside each block:
+
+```{r grouped-suppression}
+by_authority <- data.frame(
+  authority = c("Island", "Island", "Interior", "Interior"),
+  area = c("North", "South", "East", "West"),
+  cases = c(2, 30, 4, 25)
+)
+
+hidden <- islh_suppress_table(
+  by_authority,
+  cols = "cases",
+  threshold = 5,
+  label = "Suppressed",
+  complementary = TRUE,
+  by = "authority"
+)
+
+hidden
+```
+
+Column-wide, two cells are small and the arithmetic already fails to close.
+Within each authority there is exactly one hidden cell, which a reader recovers
+by subtracting from that authority's subtotal, so a second cell goes in each.
+
+`islh_suppression_audit()` reports what was hidden and why, so a reviewer can
+confirm the rule fired where it should have. It records no counts, only which
+cells were hidden, so it is safe to keep beside a released table:
+
+```{r suppression-audit}
+islh_suppression_audit(hidden)
 ```
 
 This helper works independently within each selected column. It does not prove

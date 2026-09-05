@@ -99,6 +99,18 @@ islh_bc_sources <- function() {
 #' join the population rows to the filtered object returned by
 #' [islh_bc_geography()] and allow unmatched population rows to be discarded.
 #'
+#' @section Zero populations:
+#'
+#' A zero cell is kept. In a small local health area an age band can genuinely
+#' have nobody in it, and that is a real measurement rather than a gap in the
+#' data. Dropping those rows would silently turn a complete denominator table
+#' into an incomplete one, so a later join would produce missing populations
+#' that look like a download problem.
+#'
+#' A zero denominator has no rate, so the rate functions refuse it rather than
+#' return an infinite one. See the zero-denominator section of
+#' [islh_crude_rate()] for what to do with these rows.
+#'
 #' @param geography `"lha"` or `"hsda"`.
 #' @param years Optional numeric vector of years. `NULL` returns all years in
 #'   the resource.
@@ -321,7 +333,7 @@ islh_bc_geography <- function(
         "age_group"
       )
     ) |>
-    dplyr::filter(.data$population > 0, !is.na(.data$age_group)) |>
+    dplyr::filter(!is.na(.data$age_group)) |>
     dplyr::arrange(
       .data$geography_code,
       .data$year,

@@ -12,4 +12,17 @@ sources. It implements calculation mechanics and data access, not
 disclosure or analytic policy. Confirm thresholds, standard populations and
 interval methods against the standard governing each release.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://temuulene.github.io/islhepi/}
+  \item \url{https://github.com/temuulene/islhepi}
+  \item Report bugs at \url{https://github.com/temuulene/islhepi/issues}
+}
+
+}
+\author{
+\strong{Maintainer}: Temuulen Enebish \email{temuulen@gmail.com}
+
+}
 \keyword{internal}

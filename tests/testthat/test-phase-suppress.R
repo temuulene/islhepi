@@ -264,3 +264,188 @@ test_that("suppression labels are scalar and complementary labels are neutral", 
 })
 
 
+
+# Column selection -----------------------------------------------------------
+
+suppress_frame <- function() {
+  data.frame(
+    authority = c("Island", "Island", "Interior", "Interior"),
+    area = c("North", "South", "East", "West"),
+    cases = c(2, 30, 4, 25),
+    contacts = c(1, 12, 3, 40),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("cols rejects selections that would silently pick another column", {
+  data <- suppress_frame()
+
+  # 1.5 truncates to column 1, which is `authority`.
+  expect_error(
+    islh_suppress_table(data, 1.5, threshold = 5),
+    "whole column positions"
+  )
+  # TRUE is column 1 as well, not "every column".
+  expect_error(
+    islh_suppress_table(data, TRUE, threshold = 5),
+    "is logical"
+  )
+  # A factor indexes by level code, so this is column 1 too.
+  expect_error(
+    islh_suppress_table(data, factor("cases"), threshold = 5),
+    "is a factor"
+  )
+})
+
+test_that("cols rejects empty, duplicated and out-of-range selections", {
+  data <- suppress_frame()
+
+  expect_error(islh_suppress_table(data, character(0), threshold = 5), "empty")
+  expect_error(islh_suppress_table(data, integer(0), threshold = 5), "empty")
+  expect_error(
+    islh_suppress_table(data, c("cases", "cases"), threshold = 5),
+    "more than once"
+  )
+  expect_error(
+    islh_suppress_table(data, c(3, 3), threshold = 5),
+    "more than once"
+  )
+  expect_error(islh_suppress_table(data, 0, threshold = 5), "within")
+  expect_error(islh_suppress_table(data, 99, threshold = 5), "within")
+  expect_error(islh_suppress_table(data, -1, threshold = 5), "within")
+  expect_error(
+    islh_suppress_table(data, NA_character_, threshold = 5),
+    "missing values"
+  )
+  expect_error(islh_suppress_table(data, NA_integer_, threshold = 5), "missing")
+  expect_error(islh_suppress_table(data, NULL, threshold = 5), "must name")
+  expect_error(islh_suppress_table(data, list("cases"), threshold = 5), "names or positions")
+})
+
+test_that("valid positions and names select the same columns", {
+  data <- suppress_frame()
+  by_name <- islh_suppress_table(data, c("cases", "contacts"), threshold = 5)
+  by_position <- islh_suppress_table(data, c(3, 4), threshold = 5)
+  expect_equal(by_name, by_position)
+})
+
+# Group-specific complementary suppression -----------------------------------
+
+test_that("complementary suppression runs within each group", {
+  data <- suppress_frame()
+
+  # Across the whole column two cells are small, so the column-wide rule sees
+  # no recoverable cell and stops. Within each authority there is exactly one,
+  # and a reader subtracts from that authority's subtotal to recover it.
+  ungrouped <- islh_suppress_table(
+    data, "cases", threshold = 5,
+    complementary = TRUE, label = "Suppressed"
+  )
+  expect_equal(ungrouped$cases, c("Suppressed", "30", "Suppressed", "25"))
+
+  grouped <- islh_suppress_table(
+    data, "cases", threshold = 5,
+    complementary = TRUE, by = "authority", label = "Suppressed"
+  )
+  expect_equal(
+    grouped$cases,
+    c("Suppressed", "Suppressed", "Suppressed", "Suppressed")
+  )
+})
+
+test_that("grouping accepts several columns and leaves other groups alone", {
+  data <- data.frame(
+    year = c(2025, 2025, 2026, 2026),
+    authority = c("Island", "Island", "Island", "Island"),
+    cases = c(3, 40, 20, 30),
+    stringsAsFactors = FALSE
+  )
+
+  out <- islh_suppress_table(
+    data, "cases", threshold = 5,
+    complementary = TRUE, by = c("year", "authority"), label = "Suppressed"
+  )
+
+  # 2025 has one small cell so its larger partner goes too. 2026 has none, so
+  # both of its cells stay.
+  expect_equal(out$cases, c("Suppressed", "Suppressed", "20", "30"))
+})
+
+test_that("by is validated against data and cols", {
+  data <- suppress_frame()
+
+  expect_error(
+    islh_suppress_table(data, "cases", threshold = 5, by = "missing"),
+    "no column"
+  )
+  expect_error(
+    islh_suppress_table(data, "cases", threshold = 5, by = "cases"),
+    "share"
+  )
+  expect_error(
+    islh_suppress_table(data, "cases", threshold = 5, by = c("area", "area")),
+    "more than once"
+  )
+  expect_error(
+    islh_suppress_table(data, "cases", threshold = 5, by = 1),
+    "NULL or column names"
+  )
+})
+
+# Audit record ---------------------------------------------------------------
+
+test_that("the audit record names every hidden cell and why", {
+  data <- suppress_frame()
+  out <- islh_suppress_table(
+    data, "cases", threshold = 5,
+    complementary = TRUE, by = "authority", label = "Suppressed"
+  )
+  audit <- islh_suppression_audit(out)
+
+  expect_equal(names(audit), c("column", "row", "group", "reason"))
+  expect_equal(nrow(audit), 4L)
+  expect_equal(audit$row, c(1L, 2L, 3L, 4L))
+  expect_equal(audit$group, c("Island", "Island", "Interior", "Interior"))
+  expect_equal(
+    audit$reason,
+    c("small", "complementary", "small", "complementary")
+  )
+})
+
+test_that("the audit record holds no counts", {
+  data <- suppress_frame()
+  out <- islh_suppress_table(data, "cases", threshold = 5)
+  audit <- islh_suppression_audit(out)
+
+  # Carrying the hidden values would defeat the suppression the moment the
+  # object was shared.
+  expect_false(any(c("value", "count", "n") %in% names(audit)))
+  expect_true(all(vapply(audit[c("column", "group", "reason")], is.character, logical(1))))
+})
+
+test_that("a table with nothing hidden gives a zero-row audit", {
+  data <- data.frame(area = c("North", "South"), cases = c(20, 30))
+  out <- islh_suppress_table(data, "cases", threshold = 5)
+
+  audit <- islh_suppression_audit(out)
+  expect_equal(nrow(audit), 0L)
+  expect_equal(names(audit), c("column", "row", "group", "reason"))
+})
+
+test_that("the audit covers every suppressed column", {
+  data <- suppress_frame()
+  out <- islh_suppress_table(data, c("cases", "contacts"), threshold = 5)
+  audit <- islh_suppression_audit(out)
+
+  expect_equal(sort(unique(audit$column)), c("cases", "contacts"))
+  expect_equal(audit$row[audit$column == "cases"], c(1L, 3L))
+  expect_equal(audit$row[audit$column == "contacts"], c(1L, 3L))
+})
+
+test_that("reading an audit from an unsuppressed table is an error", {
+  expect_error(
+    islh_suppression_audit(data.frame(x = 1)),
+    "no suppression record"
+  )
+  expect_error(islh_suppression_audit("not a data frame"), "data frame")
+})
