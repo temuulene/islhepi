@@ -1115,9 +1115,9 @@ islh_surveillance_snapshot <- function(
     ),
     week_start = 1,
     baseline = NULL,
-    baseline_interval = NULL,
     include_total = FALSE,
-    total_label = "All") {
+    total_label = "All",
+    baseline_interval = NULL) {
   if (!is.data.frame(data)) {
     .islh_abort("{.arg data} must be a data frame.")
   }

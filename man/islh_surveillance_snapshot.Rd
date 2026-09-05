@@ -14,9 +14,9 @@ islh_surveillance_snapshot(
   interval = c("day", "week", "isoweek", "epiweek", "month", "quarter", "year"),
   week_start = 1,
   baseline = NULL,
-  baseline_interval = NULL,
   include_total = FALSE,
-  total_label = "All"
+  total_label = "All",
+  baseline_interval = NULL
 )
 }
 \arguments{
@@ -43,15 +43,15 @@ example, a seven-day snapshot should use a baseline of historical
 seven-day or weekly totals, not historical daily counts. Mismatched
 durations are refused rather than reported.}
 
-\item{baseline_interval}{Duration one \code{baseline} limit describes, named
-explicitly. Use it for limits that did not come from
-\code{\link[=islh_surveillance_baseline]{islh_surveillance_baseline()}}, such as last season's totals read from a
-spreadsheet. \code{NULL} uses the duration the baseline records.}
-
 \item{include_total}{Add an \code{All} row. This is only available with one
 grouping column and should only be used for mutually exclusive groups.}
 
 \item{total_label}{Label used for the total group.}
+
+\item{baseline_interval}{Duration one \code{baseline} limit describes, named
+explicitly. Use it for limits that did not come from
+\code{\link[=islh_surveillance_baseline]{islh_surveillance_baseline()}}, such as last season's totals read from a
+spreadsheet. \code{NULL} uses the duration the baseline records.}
 }
 \value{
 A wide data frame containing groups, \code{total}, optional baseline
